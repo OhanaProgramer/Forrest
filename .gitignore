@@ -1,0 +1,55 @@
+# -----------------------------
+# Python bytecode & caches
+# -----------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+
+# -----------------------------
+# Virtual environments
+# -----------------------------
+.venv/
+venv/
+env/
+ENV/
+.env/
+
+# -----------------------------
+# Python tooling / status
+# -----------------------------
+.pytest_cache/
+.mypy_cache/
+.pytype/
+.pyre/
+.coverage
+coverage.xml
+htmlcov/
+
+# -----------------------------
+# IDE / editor junk
+# -----------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# -----------------------------
+# Logs & runtime files
+# -----------------------------
+*.log
+*.pid
+
+# -----------------------------
+# Media files (not source)
+# -----------------------------
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.webm
+
+# -----------------------------
+# OS junk
+# -----------------------------
+Thumbs.db
