@@ -53,3 +53,10 @@ htmlcov/
 # OS junk
 # -----------------------------
 Thumbs.db
+
+# -----------------------------
+# Forrest data (keep small samples by adding them with `git add -f`)
+# -----------------------------
+data/**/*.jsonl
+data/**/*.csv
+*.egg-info/
