@@ -58,6 +58,17 @@ m5_clear_d   = 5.5;   // 2020 extrusion T-nut bolts
 fan_size = 40;  fan_hole_dx = 32;  fan_hole_d = 3.4;
 fan_c = [33, 28];     // over the Hailo heatsink (measure and adjust)
 
+/* ---------- Optional side fan (front / USB-C-HDMI side) ----------
+   A 40 mm fan on a separate bracket, blowing into the Pi-HAT gap so the
+   Active Cooler breathes fresh air. Sits to the right of the HDMI plugs
+   (x 48..88) so every port stays usable. The GPIO side is not used: the
+   stacking header's body is a solid wall under the HAT there. */
+sf_x0 = 48;  sf_z0 = 8;                 // fan's lower-left corner
+sf_c  = [sf_x0 + 20, sf_z0 + 20];       // fan centre (x, z)
+sf_t  = 3;                              // bracket plate thickness
+sf_boss_x = 53;                         // lower screw, into the rail boss
+sf_bracket_holes = [[90, 20], [90, 40], [sf_boss_x, 5]];   // (x, z)
+
 /* ---------- GPIO slot in the lid ---------- */
 gpio_x0 = 7;  gpio_len = 52;  gpio_y = 52.5;  gpio_slot_w = 9;
 
@@ -102,6 +113,8 @@ module tray() {
             // low stiffening rails along the long sides (below the Pi)
             for (y = [y0, y1 - 3])
                 translate([x0, y, 0]) cube([x1 - x0, 3, 4]);
+            // boss on the front rail for the side-fan bracket's lower screw
+            translate([sf_boss_x - 3, y0, 0]) cube([6, 3, 10]);
             camera_wall();
         }
         // Pi screws from underneath, heads recessed
@@ -114,6 +127,9 @@ module tray() {
             hull() for (y = [0, 36]) translate([0, y, 0]) cylinder(d = 4, h = floor_t + 2);
         // lid screw pilots in the posts
         for (p = post_c) translate([p[0], p[1], lid_z - 12]) cylinder(d = lid_pilot_d, h = 13);
+        // side-fan bracket pilots: into the right front post, and the rail boss
+        for (h = sf_bracket_holes) translate([h[0], y0 - 1, h[1]])
+            rotate([-90, 0, 0]) cylinder(d = lid_pilot_d, h = 11);
         // 2020 rail mount: two M5 holes on the centreline
         for (x = [10, 75]) translate([x, cam_cy, -floor_t - feet_h - 1])
             cylinder(d = m5_clear_d, h = floor_t + feet_h + 2);
@@ -175,6 +191,32 @@ module lid() {
     }
 }
 
+/* ================= SIDE-FAN BRACKET ================= */
+// Modelled in place (plate in the x-z plane against the front of the posts).
+// Print it lying flat: it is a plain 3 mm plate.
+module sidefan() {
+    translate([0, y0, 0]) rotate([90, 0, 0]) difference() {
+        // plate: x 47..94, z 2..52, thickness sf_t (towards -y)
+        translate([47, 2, 0]) cube([x1 - 47, 50, sf_t]);
+        // grille opening
+        translate([sf_c[0], sf_c[1], -1]) difference() {
+            cylinder(d = fan_size - 3, h = sf_t + 2);
+            for (r = [10, 17]) difference() {
+                cylinder(r = r + 1, h = sf_t + 2);
+                cylinder(r = r - 1, h = sf_t + 2);
+            }
+            for (a = [0, 90]) rotate([0, 0, a]) translate([-1, -fan_size/2, 0]) cube([2, fan_size, sf_t + 2]);
+        }
+        // fan screws
+        for (i = [-1, 1], j = [-1, 1])
+            translate([sf_c[0] + i*fan_hole_dx/2, sf_c[1] + j*fan_hole_dx/2, -1])
+                cylinder(d = fan_hole_d, h = sf_t + 2);
+        // bracket screws into the post and rail boss
+        for (h = sf_bracket_holes) translate([h[0], h[1], -1])
+            cylinder(d = lid_clear_d, h = sf_t + 2);
+    }
+}
+
 /* ================= Ghosts (preview only) ================= */
 module ghosts() {
     // Pi, cooler block, HAT, heatsink, fan
@@ -189,8 +231,11 @@ module ghosts() {
 
 if (part == "tray") tray();
 else if (part == "lid") lid();
+else if (part == "sidefan") rotate([-90, 0, 0]) translate([0, -y0, 0]) sidefan();  // flat for printing
 else {
     color("orange") tray();
     color("tan", 0.85) translate([0, 0, lid_z]) lid();
+    color("tan", 0.85) sidefan();
+    color("dimgray", 0.5) translate([sf_x0, y0 - sf_t - 10, sf_z0]) cube([fan_size, 10, fan_size]);
     ghosts();
 }
