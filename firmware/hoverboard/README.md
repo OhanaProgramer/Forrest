@@ -34,6 +34,10 @@ bash firmware/hoverboard/prepare.sh
 cd firmware/hoverboard/build/efoc && pio run -e VARIANT_USART
 ```
 
+Also: slide the ST-Link's metal shell off and check the pin names printed on
+its circuit board against the label on the shell. Some clones differ; wire by
+the board's printing. Photo it.
+
 **Done when** `st-info --probe` sees the ST-Link and the build ends with
 `firmware.bin` under `.pio/build/VARIANT_USART/`.
 
@@ -59,6 +63,17 @@ Forrest's settings (applied by `prepare.sh`, listed by its diff):
 
 If H1 passes, this is the board. Ship the HY-A02C back.
 If it fails, return the G13 and we look again.
+
+### Staying recoverable (read once before H3)
+
+The chip can always be wiped and reflashed through SWDIO/SWCLK; a failed or
+interrupted flash means "flash again". What actually kills boards:
+- powering the board from the ST-Link's 3.3V pin (never connected here);
+- the sensor cable's ~15 V wire reaching a data pin (multimeter first, red wire unused);
+- shorts while wiring (battery off while connecting);
+- a chip other than STM32F103 / GD32F103 (H1 checks).
+If a GD32 acts oddly after flashing, the unlock didn't fully clear: redo it with
+the EFeru wiki's longer command set, then flash again.
 
 ### H3. Unlock (one-way: erases the stock firmware forever)
 
