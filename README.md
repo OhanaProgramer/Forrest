@@ -14,13 +14,14 @@ The design record and decisions live in Continuity
 
 | Path | What |
 |---|---|
-| `src/forrest/drivers/` | The only code that talks to hardware (LIDAR now; Pico link, camera later) |
+| `src/forrest/drivers/` | The only code that talks to hardware (LIDAR, hoverboard board; Pico link, camera later) |
 | `src/forrest/sensing/` | Scans, sectors, record/replay |
 | `src/forrest/health/` | Pi power and heat checks |
 | `src/forrest/tools/cli.py` | The `forrest` command (bench tools) |
 | `tests/` | Run anywhere, no hardware: `pytest` |
 | `docs/BENCH.md` | Step-by-step for B1 (LIDAR) and B2 (battery soak) |
 | `pi/setup_pi.sh` | Set up or rebuild the Pi in one command |
+| `firmware/hoverboard/` | Drive board: flow of events H0-H7, firmware settings, Mac setup |
 | `firmware/pico/` | Pico safety bridge (MicroPython), B4 |
 | `cad/` | OpenSCAD sources; `cad/stl/` ready to print |
 | `data/` | Recordings and logs (large files are not committed) |

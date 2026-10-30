@@ -5,6 +5,8 @@
     forrest lidar view   [--replay FILE.jsonl]  # plot (needs the [viz] extra)
     forrest soak         [--minutes 60]         # B2: LIDAR spinning + power log
     forrest power                               # one-shot Pi power/heat check
+    forrest drive listen --port P [--log F]     # hoverboard feedback (H5)
+    forrest drive spin --port P --left N --right N [--seconds S]   # H6, wheels up
 """
 
 from __future__ import annotations
@@ -178,6 +180,59 @@ def cmd_power(args) -> int:
 
 
 # ---------------------------------------------------------------------------
+# drive  (hoverboard board over serial: H5 listen, H6 spin; wheels off the ground)
+# ---------------------------------------------------------------------------
+
+def _fmt_fb(fb) -> str:
+    return (f"bat {fb.battery_v:5.2f} V  temp {fb.board_temp_c:4.1f} C  "
+            f"rpm L {fb.rpm_left:5d} R {fb.rpm_right:5d}  "
+            f"cmd L {fb.cmd_left:5d} R {fb.cmd_right:5d}")
+
+
+def cmd_drive_listen(args) -> int:
+    import json
+    from forrest.drivers.hoverboard import Hoverboard
+    log = Path(args.log).open("a") if args.log else None
+    n, t0, last_print = 0, time.time(), 0.0
+    try:
+        with Hoverboard(args.port) as hb:
+            for fb in hb.iter_feedback():
+                n += 1
+                if log:
+                    log.write(json.dumps(fb.as_record()) + "\n")
+                if fb.t - last_print >= 0.2:
+                    rate = n / max(fb.t - t0, 1e-3)
+                    sys.stdout.write(f"\r{rate:5.0f} frames/s  bad {hb.parser.bad_frames:3d}  {_fmt_fb(fb)}   ")
+                    sys.stdout.flush()
+                    last_print = fb.t
+    finally:
+        if log:
+            log.close()
+    return 0
+
+
+def cmd_drive_spin(args) -> int:
+    from forrest.drivers.hoverboard import Hoverboard
+    if max(abs(args.left), abs(args.right)) > args.limit:
+        print(f"Refusing: commands above {args.limit} need --limit raised on purpose.")
+        return 1
+    period = 1.0 / args.rate
+    with Hoverboard(args.port) as hb:
+        end = time.time() + args.seconds
+        next_print = 0.0
+        while time.time() < end:
+            hb.send(args.left, args.right)
+            hb.poll()
+            if hb.latest and time.time() >= next_print:
+                print(_fmt_fb(hb.latest))
+                next_print = time.time() + 0.25
+            time.sleep(period)
+        # Hoverboard.close() sends zero commands
+    print("stopped (zero commands sent)")
+    return 0
+
+
+# ---------------------------------------------------------------------------
 
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(prog="forrest", description=__doc__,
@@ -212,6 +267,23 @@ def main(argv=None) -> int:
 
     pw = sub.add_parser("power", help="one-shot Pi power and heat check")
     pw.set_defaults(func=cmd_power)
+
+    drive = sub.add_parser("drive", help="hoverboard board over serial (wheels off the ground)")
+    dsub = drive.add_subparsers(dest="drive_cmd", required=True)
+
+    dl = dsub.add_parser("listen", help="print live feedback: battery, temp, wheel rpm")
+    dl.add_argument("--port", required=True, help="e.g. /dev/cu.usbserial-0001")
+    dl.add_argument("--log", help="append each frame as JSON lines")
+    dl.set_defaults(func=cmd_drive_listen)
+
+    ds = dsub.add_parser("spin", help="send a steady wheel command for a few seconds")
+    ds.add_argument("--port", required=True)
+    ds.add_argument("--left", type=int, default=0, help="-1000..1000")
+    ds.add_argument("--right", type=int, default=0, help="-1000..1000")
+    ds.add_argument("--seconds", type=float, default=3)
+    ds.add_argument("--rate", type=float, default=20, help="commands per second")
+    ds.add_argument("--limit", type=int, default=150, help="bench safety cap on |command|")
+    ds.set_defaults(func=cmd_drive_spin)
 
     args = p.parse_args(argv)
     try:
