@@ -65,6 +65,17 @@ If it fails, return the G13 and we look again.
 The original firmware can't be read out or restored. After this the board is
 Forrest's, not a hoverboard.
 
+First, try a backup anyway (harmless, takes seconds, wiring as below):
+
+```bash
+st-info --probe                                   # chip ID and flash size; works even when locked
+st-flash read stock_backup.bin 0x8000000 0x40000  # 256 KB
+```
+
+Expected: the read fails or the file is all zeros/0xFF, which confirms the
+chip's read protection is on and there's nothing to save. If it ever comes back
+with real data, keep that file and tell me before unlocking.
+
 Wiring, ST-Link to the board header:
 
 | ST-Link | Board |
