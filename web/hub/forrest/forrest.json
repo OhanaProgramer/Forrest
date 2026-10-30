@@ -1,0 +1,28 @@
+{
+  "headline": "Control test bed for the runner-safety cart. Bench first.",
+  "detail": "H0 done (Mac tools + firmware built) · awaiting Gyroor G13 board (Sat)",
+  "last_updated": "2026-10-30T15:30:00-06:00",
+  "steps": [
+    {"label": "Case v0", "state": "active", "note": "printed at the library; fit check pending"},
+    {"label": "Drive H0 — Mac tools + firmware build", "state": "done", "note": "ST-Link + CP2102 proven; firmware.bin built"},
+    {"label": "Drive H1–H2 — G13 arrival + keep/return", "state": "next", "note": "label, ride test, open & photograph the board"},
+    {"label": "Drive H3–H6 — unlock, flash, first spin", "state": "pending", "note": "wheels off the ground, gentle limits"},
+    {"label": "B1 — LIDAR on the Pi", "state": "pending", "note": "see yourself as a moving blob"},
+    {"label": "B2 — battery soak (success line)", "state": "pending", "note": "1 h on the 3S pack, no under-voltage"},
+    {"label": "B4 — Pico safety bridge", "state": "pending", "note": "heartbeat + failsafe between Pi and board"},
+    {"label": "B3 — follow Jacque", "state": "pending", "note": "live angle + range at ~1 m"}
+  ],
+  "cards": [
+    {"name": "Drive", "state": "building", "note": "battery V, wheel rpm, board temp"},
+    {"name": "Safety", "state": "pending", "note": "Pico heartbeat, failsafe, stop"},
+    {"name": "Power", "state": "pending", "note": "compute battery + Pi heat/throttle"},
+    {"name": "LIDAR", "state": "pending", "note": "scan rate, nearest by sector"},
+    {"name": "Runner", "state": "pending", "note": "lock, distance, angle"},
+    {"name": "Threat / camera", "state": "started", "note": "Hailo + camera demo ran (M0)"},
+    {"name": "Science", "state": "later", "note": "air + environment sensors (Sr)"}
+  ],
+  "latest": null,
+  "links": [
+    {"label": "Code repo (GitHub)", "url": "https://github.com/OhanaProgramer/Forrest"}
+  ]
+}

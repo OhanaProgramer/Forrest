@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Forrest · Home Lab</title>
+<style>
+  :root{
+    color-scheme: dark;
+    --bg:#14161a; --card-bg:#1f232a; --text:#e6e8eb; --muted:#8a8f98;
+    --accent:#6496ff; --done:#3fb950; --active:#6496ff; --next:#d29922;
+    --started:#9b7bff; --pending:#565b63;
+  }
+  *{box-sizing:border-box;}
+  body{background:var(--bg);color:var(--text);margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
+  .site-header{position:sticky;top:0;z-index:100;
+    background:linear-gradient(180deg,rgba(20,25,35,.95),rgba(15,20,30,.85));
+    border-bottom:1px solid rgba(100,150,255,.2);backdrop-filter:blur(6px);}
+  .header-content{max-width:1100px;margin:0 auto;padding:14px 20px;
+    display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;}
+  .brand{font-size:1.25rem;font-weight:700;color:#fff;}
+  .site-nav{display:flex;gap:8px;flex-wrap:wrap;}
+  .nav-link{color:rgba(255,255,255,.7);text-decoration:none;padding:7px 12px;
+    border-radius:6px;font-size:.95rem;transition:all .15s ease;}
+  .nav-link:hover{color:#fff;background:rgba(100,150,255,.12);}
+  .nav-link.active{color:#fff;background:rgba(100,150,255,.2);border-bottom:2px solid var(--accent);}
+  main{max-width:1100px;margin:0 auto;padding:24px 20px 48px;}
+  h1{font-weight:600;margin:.2rem 0 .1rem;font-size:1.9rem;}
+  .sub{color:var(--muted);margin:.1rem 0 .3rem;}
+  .updated{color:var(--muted);font-size:.8rem;margin:0 0 1.6rem;}
+  h2.section{font-size:1.15rem;font-weight:600;margin:1.8rem 0 .8rem;
+    border-bottom:1px solid rgba(138,143,152,.18);padding-bottom:.4rem;}
+  .row{display:flex;align-items:baseline;gap:.7rem;padding:.55rem .2rem;
+    border-bottom:1px solid rgba(138,143,152,.1);}
+  .row .label{flex:1 1 40%;font-weight:600;}
+  .row .note{flex:2 1 45%;color:var(--muted);font-size:.88rem;}
+  .badge{flex:0 0 auto;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;
+    font-weight:700;padding:.16rem .55rem;border-radius:999px;white-space:nowrap;color:#0c0e11;}
+  .badge.done{background:var(--done);} .badge.active,.badge.building{background:var(--active);}
+  .badge.next{background:var(--next);} .badge.started{background:var(--started);color:#fff;}
+  .badge.pending,.badge.later{background:var(--pending);color:#cfd3d9;}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1rem;}
+  .card{background:var(--card-bg);border-radius:10px;padding:1rem 1.2rem;border-left:4px solid var(--pending);}
+  .card.done{border-left-color:var(--done);} .card.building,.card.active{border-left-color:var(--active);}
+  .card.next{border-left-color:var(--next);} .card.started{border-left-color:var(--started);}
+  .card h3{margin:0 0 .5rem;font-size:1.05rem;display:flex;justify-content:space-between;align-items:center;gap:.5rem;}
+  .card .note{margin:0;color:var(--muted);font-size:.88rem;line-height:1.4;}
+  .latest{display:flex;gap:1.6rem;flex-wrap:wrap;margin:.4rem 0 1rem;}
+  .metric{font-size:1.7rem;font-weight:700;}
+  .metric small{display:block;font-size:.7rem;font-weight:500;color:var(--muted);margin-top:.15rem;}
+  .empty{color:var(--muted);font-size:.92rem;}
+  a.link{color:var(--accent);text-decoration:none;} a.link:hover{text-decoration:underline;}
+  ul.links{list-style:none;padding:0;margin:0;} ul.links li{padding:.25rem 0;}
+</style>
+</head>
+<body>
+<header class="site-header">
+  <div class="header-content">
+    <span class="brand">Home Lab</span>
+    <nav class="site-nav">
+      <a class="nav-link" href="/">Network</a>
+      <a class="nav-link" href="/personal/">Fitness</a>
+      <a class="nav-link active" href="/forrest/">Forrest</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <h1>Forrest Jr</h1>
+  <p class="sub" id="headline">&nbsp;</p>
+  <p class="updated" id="updated"></p>
+
+  <h2 class="section">Build steps</h2>
+  <div id="steps"></div>
+
+  <h2 class="section">Dashboard cards</h2>
+  <div class="cards" id="cards"></div>
+
+  <h2 class="section">Latest drive readings</h2>
+  <div id="latest"></div>
+
+  <h2 class="section">Links</h2>
+  <ul class="links" id="links"></ul>
+</main>
+
+<script>
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function fmtAge(iso){
+  if(!iso) return "unknown";
+  const d=new Date(iso); if(isNaN(d)) return "unknown";
+  const min=(Date.now()-d.getTime())/60000;
+  if(min<1) return "just now";
+  if(min<60) return Math.floor(min)+" min ago";
+  if(min<1440) return Math.floor(min/60)+"h ago";
+  return Math.floor(min/1440)+"d ago";
+}
+function render(d){
+  document.getElementById('headline').textContent=d.headline||'';
+  document.getElementById('updated').textContent='updated '+fmtAge(d.last_updated)+(d.detail?' · '+d.detail:'');
+  document.getElementById('steps').innerHTML=(d.steps||[]).map(s=>
+    '<div class="row"><span class="label">'+esc(s.label)+'</span>'+
+    '<span class="note">'+esc(s.note||'')+'</span>'+
+    '<span class="badge '+esc(s.state)+'">'+esc(s.state)+'</span></div>').join('');
+  document.getElementById('cards').innerHTML=(d.cards||[]).map(c=>
+    '<div class="card '+esc(c.state)+'"><h3>'+esc(c.name)+
+    '<span class="badge '+esc(c.state)+'">'+esc(c.state)+'</span></h3>'+
+    '<p class="note">'+esc(c.note||'')+'</p></div>').join('');
+  const L=d.latest;
+  document.getElementById('latest').innerHTML = L ?
+    '<div class="latest">'+
+    '<div class="metric">'+Number(L.battery_v).toFixed(2)+' V<small>battery</small></div>'+
+    '<div class="metric">'+Number(L.board_temp_c).toFixed(1)+' &deg;C<small>board temp</small></div>'+
+    '<div class="metric">'+L.rpm_left+'<small>rpm left</small></div>'+
+    '<div class="metric">'+L.rpm_right+'<small>rpm right</small></div></div>'
+    : '<p class="empty">No drive data yet &mdash; fills in once the board is talking (step H5) and the live feed from the Pi is wired up.</p>';
+  document.getElementById('links').innerHTML=(d.links||[]).map(l=>
+    '<li><a class="link" href="'+esc(l.url)+'">'+esc(l.label)+'</a></li>').join('');
+}
+fetch('./forrest.json',{cache:'no-store'}).then(r=>r.json()).then(render).catch(e=>{
+  document.getElementById('headline').textContent='Could not load forrest.json';
+});
+</script>
+</body>
+</html>
