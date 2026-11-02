@@ -68,14 +68,15 @@ Slide the ST-Link's shell off and wire by the pin names printed on its *board*,
 not the shell (clones differ).
 **Done when** `st-info --probe` sees the ST-Link and `pyocd list` runs.
 
-### M1. Prove the CP2102 (loopback, no board)  ← current step
+### M1. Prove the CP2102 (loopback, no board)  ✅ done 2026-11-02
 1. Plug CP2102 into the Mac. `ls /dev/cu.*` → expect `/dev/cu.usbserial-0001`.
 2. Jumper **TXD↔RXD** on the adapter.
 3. `screen /dev/cu.usbserial-0001 115200` — type; characters echo = good. Pull the
    jumper and they stop. Exit screen: Ctrl-A, K, y.
 **Done when** the loopback echoes.
+Result 2026-11-02: 3 runs × 83 random bytes over `/dev/cu.usbserial-0001` @115200, 83/83 back, exact match each run.
 
-### M2. Confirm the board matches the pinout
+### M2. Confirm the board matches the pinout ← current step
 Compare `mm32/pinout.jpg` to the real `LC-TWO-SYS V3.1`:
 - SWD pads read `GND 5V CLK RST DIO`?
 - Blue UART connector reads `GND PB6/Tx PB4/Rx +12V`?
