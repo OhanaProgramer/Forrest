@@ -76,13 +76,41 @@ not the shell (clones differ).
 **Done when** the loopback echoes.
 Result 2026-11-02: 3 runs × 83 random bytes over `/dev/cu.usbserial-0001` @115200, 83/83 back, exact match each run.
 
-### M2. Confirm the board matches the pinout ← current step
-Compare `mm32/pinout.jpg` to the real `LC-TWO-SYS V3.1`:
-- SWD pads read `GND 5V CLK RST DIO`?
-- Blue UART connector reads `GND PB6/Tx PB4/Rx +12V`?
-- **Slave (副板) center chip is also MM32SPIN05** (close-up).
-**Done when** both boards confirmed MM32SPIN05 and the SWD + UART pins match (or
-the differences are noted).
+### M2. Hardware ID + bench test — METER ONLY, no computer yet  ← current step
+Everything here uses the multimeter on **both** boards (master 主板 + slave 副板)
+**before** any ST-Link or CP2102 touches them. Goal: know every pin and prove the
+board is electrically sound, so the computer attach (M3) is safe. Record each pin
+on the board-map artifact as you go.
+
+Meter setup: black probe → **COM**, red probe → **VΩ** jack. Continuity for ID,
+DC volts for the live checks.
+
+**A. Identify the key pins on each board** (compare to `mm32/pinout.jpg`, but
+confirm by meter — don't trust silkscreen alone):
+- **SWD pads** (`GND 5V CLK RST DIO`): confirm **GND** by continuity to
+  battery-negative. These are the flash pins; we use GND / CLK / DIO.
+- **UART connector** (blue 4-pin): find **GND** (continuity, power OFF), then the
+  **+12V/power** pin (DC volts, power ON — reads ~pack voltage). The remaining two
+  are **Tx/Rx**. Write the pin order down.
+- **MCU**: confirm each board's center chip is **MM32SPIN05PF** (close-up).
+- Note for the map: hall connector, LEDs, button, charge, phase outputs, the
+  inter-board link.
+
+**B. Unpowered sanity** (continuity, board OFF):
+- All the connector grounds tie to battery-negative.
+- **No dead short** battery+ ↔ battery− (should NOT beep).
+- Each of the 3 fat phase wires has continuity into the motor (phase-to-phase a
+  few ohms; none shorted to ground).
+
+**C. Powered rails** (DC volts, board ON):
+- Pack voltage at the battery terminals (~16–18 V on this 18 V board).
+- The UART **+12V** pin ≈ pack voltage.
+- The **3.3V** pad ≈ 3.3 V (the MCU supply is alive).
+- Board powers up to a normal status light (level, no error).
+
+**Done when** both boards are confirmed MM32SPIN05; SWD (GND/CLK/DIO) and UART
+(GND/Tx/Rx/+12V) pins are identified and written down; no shorts; 3.3 V and pack
+rails good. **Only then → M3** (first computer attach).
 
 ### M3. Wire ST-Link → SWD  (board on its OWN battery, hold the power button)
 GND→GND, CLK→SWCLK, DIO→SWDIO. 5V unconnected. Hold the power button the whole
