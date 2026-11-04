@@ -5,107 +5,105 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Forrest Jr</title>
 <style>
-  :root { --bg:#f6f7f8; --card:#fff; --ink:#1d2328; --dim:#68737d; --line:#e1e5e8;
-          --ok:#1f8a4c; --warn:#b7791f; --bad:#c53030; }
+  :root { --bg:#f5f6f7; --card:#ffffff; --ink:#1c2227; --dim:#6a747d; --line:#e0e4e7;
+          --ok:#1f8a4c; --warn:#b7791f; --bad:#c53030; --na:#9aa3ab; }
   @media (prefers-color-scheme: dark) {
-    :root { --bg:#111417; --card:#1a1f24; --ink:#e6eaee; --dim:#8b969f; --line:#2a3138; }
+    :root { --bg:#101315; --card:#191e22; --ink:#e5e9ec; --dim:#8a959e; --line:#2a3137;
+            --ok:#3fbf75; --warn:#e0a63a; --bad:#f0625f; --na:#5d666e; }
   }
   * { box-sizing:border-box; }
   body { margin:0; background:var(--bg); color:var(--ink);
-         font:15px/1.4 system-ui, -apple-system, sans-serif; }
-  header { padding:14px 16px; display:flex; align-items:baseline; gap:12px; }
-  header h1 { font-size:18px; margin:0; }
-  header .sub { color:var(--dim); font-size:13px; }
-  main { display:grid; gap:12px; padding:0 16px 16px;
-         grid-template-columns: minmax(0,2fr) minmax(0,1fr); }
-  @media (max-width: 760px) { main { grid-template-columns: 1fr; } }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px 14px; }
-  .card h2 { font-size:13px; text-transform:uppercase; letter-spacing:.05em; color:var(--dim); margin:0 0 8px; }
-  #view { width:100%; aspect-ratio:4/3; background:#000; border-radius:6px; display:block; object-fit:contain; }
-  #viewmsg { color:var(--dim); font-size:13px; margin-top:6px; }
-  dl { display:grid; grid-template-columns:auto 1fr; gap:4px 12px; margin:0; }
-  dt { color:var(--dim); } dd { margin:0; font-variant-numeric:tabular-nums; text-align:right; }
-  .ok { color:var(--ok); } .warn { color:var(--warn); } .bad { color:var(--bad); }
-  .side { display:grid; gap:12px; align-content:start; }
-  ul.dets { list-style:none; margin:0; padding:0; }
-  ul.dets li { display:flex; justify-content:space-between; padding:3px 0; border-bottom:1px solid var(--line); }
-  ul.dets li:last-child { border-bottom:0; }
-  .none { color:var(--dim); }
+         font:15px/1.35 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { padding:14px 16px 10px; display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; }
+  header h1 { font-size:18px; margin:0; letter-spacing:.01em; }
+  #updated { color:var(--dim); font-size:13px; font-variant-numeric:tabular-nums; }
+  #updated.stale { color:var(--bad); }
+
+  .strip { display:grid; gap:8px; padding:0 16px;
+           grid-template-columns:repeat(auto-fit, minmax(128px, 1fr)); }
+  .tile { background:var(--card); border:1px solid var(--line); border-radius:10px;
+          padding:10px 12px 10px 14px; position:relative; overflow:hidden; min-width:0; }
+  .tile::before { content:""; position:absolute; left:0; top:0; bottom:0; width:4px; background:var(--na); }
+  .tile.ok::before { background:var(--ok); }
+  .tile.warn::before { background:var(--warn); }
+  .tile.bad::before { background:var(--bad); }
+  .tile .t { font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--dim); }
+  .tile .v { font-size:19px; font-weight:600; margin-top:2px; font-variant-numeric:tabular-nums;
+             white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tile.warn .v { color:var(--warn); } .tile.bad .v { color:var(--bad); }
+  .tile .d { font-size:12.5px; color:var(--dim); margin-top:2px; font-variant-numeric:tabular-nums;
+             overflow-wrap:anywhere; white-space:pre-line; }
+
+  #camera { margin:12px 16px 0; background:var(--card); border:1px solid var(--line);
+            border-radius:10px; padding:10px 12px; max-width:820px; }
+  #camera[hidden] { display:none; }
+  #camera h2 { font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--dim); margin:0 0 8px; }
+  #camera img { width:100%; aspect-ratio:4/3; background:#000; border-radius:6px; display:block; }
+
+  footer { padding:12px 16px 18px; color:var(--dim); font-size:12px; }
 </style>
 </head>
 <body>
-<header><h1>Forrest Jr</h1><span class="sub" id="updated">connecting…</span></header>
-<main>
-  <section class="card">
-    <h2>Camera · live detections</h2>
-    <img id="view" src="/stream" alt="Live camera view with detection boxes">
-    <div id="viewmsg"></div>
-  </section>
-  <div class="side">
-    <section class="card">
-      <h2>Vision</h2>
-      <dl>
-        <dt>State</dt><dd id="v-state">–</dd>
-        <dt>Detection rate</dt><dd id="v-fps">–</dd>
-        <dt>Frames</dt><dd id="v-frames">–</dd>
-        <dt>Model</dt><dd id="v-model">–</dd>
-      </dl>
-    </section>
-    <section class="card">
-      <h2>In view now</h2>
-      <ul class="dets" id="dets"><li class="none">–</li></ul>
-    </section>
-    <section class="card">
-      <h2>Pi hardware</h2>
-      <dl>
-        <dt>Temperature</dt><dd id="h-temp">–</dd>
-        <dt>Power / throttle</dt><dd id="h-thr">–</dd>
-        <dt>Load (1 / 5 min)</dt><dd id="h-load">–</dd>
-        <dt>Memory used</dt><dd id="h-mem">–</dd>
-        <dt>Disk free</dt><dd id="h-disk">–</dd>
-        <dt>Uptime</dt><dd id="h-up">–</dd>
-      </dl>
-    </section>
-  </div>
-</main>
+<header><h1>Forrest Jr</h1><span id="updated">connecting…</span></header>
+<section class="strip" id="strip" aria-live="polite"></section>
+<section id="camera" hidden>
+  <h2>Camera · <span id="cam-fps"></span></h2>
+  <img id="view" alt="Live camera view with detection boxes">
+</section>
+<footer>Read-only · tailnet only · refreshes every 2 s</footer>
 <script>
-const $ = id => document.getElementById(id);
-function set(id, text, cls) { const el = $(id); el.textContent = text; el.className = cls || ""; }
-function dur(s) { const h = Math.floor(s/3600), m = Math.floor(s%3600/60); return h ? `${h} h ${m} min` : `${m} min`; }
+const strip = document.getElementById("strip");
+const updated = document.getElementById("updated");
+let lastOk = 0;
+
+function render(tiles) {
+  // build once, then update text in place so the strip doesn't flicker
+  if (strip.children.length !== tiles.length) {
+    strip.innerHTML = "";
+    for (const _ of tiles) {
+      const el = document.createElement("div");
+      el.className = "tile";
+      el.innerHTML = '<div class="t"></div><div class="v"></div><div class="d"></div>';
+      strip.appendChild(el);
+    }
+  }
+  tiles.forEach((t, i) => {
+    const el = strip.children[i];
+    el.className = "tile " + t.level;
+    el.title = t.title + ": " + t.value + (t.detail ? " — " + t.detail : "");
+    el.children[0].textContent = t.title;
+    el.children[1].textContent = t.value;
+    el.children[2].textContent = t.detail || " ";
+  });
+}
+
+function camera(v) {
+  const box = document.getElementById("camera");
+  const img = document.getElementById("view");
+  if (v && v.running) {
+    if (box.hidden) { box.hidden = false; img.src = "/stream"; }
+    document.getElementById("cam-fps").textContent = `${v.fps} fps`;
+  } else if (!box.hidden) {
+    box.hidden = true; img.removeAttribute("src");
+  }
+}
 
 async function tick() {
   try {
     const r = await fetch("/api/status", {cache: "no-store"});
-    const {hardware: h, vision: v} = await r.json();
-    set("updated", "updated " + new Date(h.time * 1000).toLocaleTimeString());
-
-    set("v-state", v.running ? "running" : (v.error || "stopped"), v.running ? "ok" : "bad");
-    set("v-fps", v.fps != null ? `${v.fps} fps` : "–", v.fps >= 28 ? "ok" : v.fps > 0 ? "warn" : "");
-    set("v-frames", v.frames != null ? v.frames.toLocaleString() : "–");
-    set("v-model", v.model || "–");
-    const ul = $("dets"); ul.innerHTML = "";
-    const dets = v.detections || [];
-    if (!dets.length) ul.innerHTML = '<li class="none">nothing above threshold</li>';
-    for (const d of dets) {
-      const li = document.createElement("li");
-      li.innerHTML = `<span></span><span></span>`;
-      li.children[0].textContent = d.label;
-      li.children[1].textContent = Math.round(d.score * 100) + "%";
-      ul.appendChild(li);
-    }
-
-    const t = h.temp_c;
-    set("h-temp", t != null ? `${t.toFixed(1)} °C` : "–", t == null ? "" : t < 70 ? "ok" : t < 80 ? "warn" : "bad");
-    if (h.throttled) set("h-thr", h.throttled.ok ? "all clear" : h.throttled.problems.join("; "), h.throttled.ok ? "ok" : "bad");
-    if (h.load) set("h-load", `${h.load[0].toFixed(2)} / ${h.load[1].toFixed(2)}`);
-    if (h.memory) set("h-mem", `${h.memory.used_pct}%`);
-    set("h-disk", `${h.disk.free_gb} GB (${(100 - h.disk.used_pct).toFixed(0)}%)`, h.disk.used_pct > 90 ? "bad" : "");
-    if (h.uptime_s != null) set("h-up", dur(h.uptime_s));
+    const s = await r.json();
+    render(s.hardware.tiles);
+    camera(s.vision);
+    lastOk = Date.now();
+    updated.className = "";
+    updated.textContent = "updated " + new Date(s.hardware.time * 1000).toLocaleTimeString();
   } catch (e) {
-    set("updated", "server not reachable", "bad");
+    if (Date.now() - lastOk > 6000) {
+      updated.className = "stale";
+      updated.textContent = "not reachable — showing last values";
+    }
   }
 }
-$("view").onerror = () => { $("viewmsg").textContent = "No live view (camera not running)."; };
 tick(); setInterval(tick, 2000);
 </script>
 </body>

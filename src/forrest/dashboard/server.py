@@ -16,7 +16,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Optional
 
-from forrest.dashboard.status import read_status
+from forrest.dashboard.status import LIMITS, Monitor
 
 PAGE = Path(__file__).with_name("index.html")
 BOUNDARY = "forrestframe"
@@ -32,7 +32,8 @@ def tailscale_ip() -> Optional[str]:
 
 
 def make_handler(vision):
-    """`vision` is a VisionLoop, or None to run without a camera (Mac, tests)."""
+    """`vision` is a VisionLoop, or None to run without a camera (the default)."""
+    monitor = Monitor()
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, fmt, *args):  # keep the terminal quiet
@@ -51,9 +52,9 @@ def make_handler(vision):
             if path == "/":
                 self._send(200, PAGE.read_bytes(), "text/html; charset=utf-8")
             elif path == "/api/status":
-                body = {"hardware": read_status(),
+                body = {"hardware": monitor.read(), "limits": LIMITS,
                         "vision": vision.status() if vision else {"running": False,
-                                                                  "error": "no camera (--no-camera)"}}
+                                                                  "error": "camera off (start with --camera)"}}
                 self._send(200, json.dumps(body).encode(), "application/json")
             elif path == "/stream":
                 self._stream()

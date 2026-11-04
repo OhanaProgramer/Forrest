@@ -27,8 +27,13 @@ finished items are deleted from here.
      for proof frames. Artifacts in `data/camtest/` (git-ignored).
    - Next: fix the green cast; a longer soak (10 min) to see temperature
      settle; get detections out as data (JSON), which the status site will need.
-2. Then: design a small **status website served from the Pi** (camera, Hailo,
-   power/heat, LIDAR). Scope it before building anything.
+2. **Forrest dashboard** (`forrest dash`, http://100.123.84.14:8090/, tailnet only).
+   - **Done 2026-11-04, step 1, hardware strip:** CPU (% / GHz / temp), AI HAT
+     temp, power (throttle + input V), fan rpm, memory, disk, Wi-Fi (dBm, IP,
+     rates), Tailscale, uptime. Green/amber/red limits in `dashboard/status.py`
+     LIMITS. No sudo. Server cost 0.55% of one core while polled every 2 s.
+     Camera is opt-in (`--camera`) so `forrest view` can run alongside.
+   - Next, one at a time: trend lines, camera panel, detection log, start at boot.
 
 ## Open
 
@@ -48,5 +53,10 @@ finished items are deleted from here.
 - **00_System/USER.md**, Machines line: replace
   `forrest-jr 100.123.84.14 (Raspberry Pi, SSH on, offline since Oct 27)` with
   `forrest-jr 100.123.84.14 (Raspberry Pi 5, SSH on; Hailo-8 verified 2026-11-04)`.
+- **DECISIONS.md**, append: `## 2026-11-04 — Forrest dashboard lives in the repo,
+  served by the robot` — Forrest's visualisation page is part of the Forrest repo
+  and runs on forrest-jr (later Sr), not on the mini. Why: it reads the robot's own
+  drivers and data and must change in the same commit as them; it goes where the
+  robot goes. Tailnet-only, read-only.
 - **00_System/README.md** (Agent access routes): add one line saying that work
   between the MacBook and forrest-jr crosses through this repo's `HANDOFF.md`.

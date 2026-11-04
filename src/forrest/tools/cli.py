@@ -6,7 +6,7 @@
     forrest soak         [--minutes 60]         # B2: LIDAR spinning + power log
     forrest power                               # one-shot Pi power/heat check
     forrest view [--threshold 0.5]              # desktop window: live view + boxes
-    forrest dash [--host H] [--port 8090] [--no-camera]   # dashboard web server
+    forrest dash [--host H] [--port 8090] [--camera]      # dashboard web server
 """
 
 from __future__ import annotations
@@ -227,7 +227,7 @@ def cmd_dash(args) -> int:
     from forrest.dashboard.server import serve, tailscale_ip
     host = args.host or tailscale_ip() or "127.0.0.1"
     vision = None
-    if not args.no_camera:
+    if args.camera:
         from forrest.drivers.camera_hailo import VisionLoop
         vision = VisionLoop(threshold=args.threshold)
         vision.start()
@@ -287,7 +287,8 @@ def main(argv=None) -> int:
     d.add_argument("--host", help="bind address (default: this Pi's Tailscale IP)")
     d.add_argument("--port", type=int, default=8090)
     d.add_argument("--threshold", type=float, default=0.5, help="minimum detection score")
-    d.add_argument("--no-camera", action="store_true", help="status only (Mac, or camera busy)")
+    d.add_argument("--camera", action="store_true",
+                   help="also run camera + Hailo detection (holds the camera)")
     d.set_defaults(func=cmd_dash)
 
     args = p.parse_args(argv)
