@@ -18,6 +18,15 @@ finished items are deleted from here.
 ## Now (forrest-jr, from 2026-11-04)
 1. **HAT + camera ops test** on the Pi (Hailo-8 + ov5647): live detection runs,
    frame rate and temperature are measured, and results are logged here.
+   - **Done 2026-11-04 (first pass):** ov5647 detected (modes up to 2592x1944).
+     YOLOv8s on Hailo-8 at 1280x960, **30.0 fps** for 20 s (588 frames), Pi
+     52-54 C, `throttled=0x0`. Detection seen: person 92%; one false "kite" 46%
+     on the ceiling light. Notes: the image has a **green cast** (likely the
+     tuning file or a NoIR module; to check). `rpicam-still` with the Hailo
+     stage captures before the model loads ("HailoRT not ready"), so use video
+     for proof frames. Artifacts in `data/camtest/` (git-ignored).
+   - Next: fix the green cast; a longer soak (10 min) to see temperature
+     settle; get detections out as data (JSON), which the status site will need.
 2. Then: design a small **status website served from the Pi** (camera, Hailo,
    power/heat, LIDAR). Scope it before building anything.
 
