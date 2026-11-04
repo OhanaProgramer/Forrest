@@ -33,7 +33,13 @@ finished items are deleted from here.
      rates), Tailscale, uptime. Green/amber/red limits in `dashboard/status.py`
      LIMITS. No sudo. Server cost 0.55% of one core while polled every 2 s.
      Camera is opt-in (`--camera`) so `forrest view` can run alongside.
-   - Next, one at a time: trend lines, camera panel, detection log, start at boot.
+   - **Done 2026-11-04, step 2, visual pass:** 10 stat tiles with 2-min sparklines
+     or limit meters; status = icon + word, never colour alone; 30-min history
+     charts (temperature with caution/throttle lines, CPU load, network) with
+     hover readouts; readings table with sources; light + dark. Server samples
+     every 2 s in the background (30-min ring buffer, `/api/history`).
+     Palette: dataviz reference palette, validated in-browser (no Node needed).
+   - Next, one at a time: camera panel, detection log, start at boot.
 
 ## Open
 

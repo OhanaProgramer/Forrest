@@ -5,105 +5,530 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Forrest Jr</title>
 <style>
-  :root { --bg:#f5f6f7; --card:#ffffff; --ink:#1c2227; --dim:#6a747d; --line:#e0e4e7;
-          --ok:#1f8a4c; --warn:#b7791f; --bad:#c53030; --na:#9aa3ab; }
+  /* Tokens: the dataviz reference palette (validated light + dark). */
+  :root {
+    color-scheme: light;
+    --page:#f9f9f7; --surface:#fcfcfb; --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
+    --grid:#e1e0d9; --axis:#c3c2b7; --ring:rgba(11,11,11,0.10);
+    --s1:#2a78d6; --s2:#eb6834; --s1-wash:rgba(42,120,214,0.10);
+    --track:#cde2fb; --spark:#b9b7ae;
+    --good:#0ca30c; --warn:#fab219; --crit:#d03b3b; --na:#c3c2b7;
+  }
   @media (prefers-color-scheme: dark) {
-    :root { --bg:#101315; --card:#191e22; --ink:#e5e9ec; --dim:#8a959e; --line:#2a3137;
-            --ok:#3fbf75; --warn:#e0a63a; --bad:#f0625f; --na:#5d666e; }
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --page:#0d0d0d; --surface:#1a1a19; --ink:#f0efec; --ink-2:#c3c2b7; --muted:#898781;
+      --grid:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,0.10);
+      --s1:#3987e5; --s2:#d95926; --s1-wash:rgba(57,135,229,0.12);
+      --track:#184f95; --spark:#5f5e58; --na:#383835;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page:#0d0d0d; --surface:#1a1a19; --ink:#f0efec; --ink-2:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,0.10);
+    --s1:#3987e5; --s2:#d95926; --s1-wash:rgba(57,135,229,0.12);
+    --track:#184f95; --spark:#5f5e58; --na:#383835;
   }
   * { box-sizing:border-box; }
-  body { margin:0; background:var(--bg); color:var(--ink);
-         font:15px/1.35 system-ui, -apple-system, "Segoe UI", sans-serif; }
-  header { padding:14px 16px 10px; display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; }
-  header h1 { font-size:18px; margin:0; letter-spacing:.01em; }
-  #updated { color:var(--dim); font-size:13px; font-variant-numeric:tabular-nums; }
-  #updated.stale { color:var(--bad); }
+  body { margin:0; background:var(--page); color:var(--ink);
+         font:15px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .wrap { max-width:1440px; margin:0 auto; padding:0 16px 24px; }
 
-  .strip { display:grid; gap:8px; padding:0 16px;
-           grid-template-columns:repeat(auto-fit, minmax(128px, 1fr)); }
-  .tile { background:var(--card); border:1px solid var(--line); border-radius:10px;
-          padding:10px 12px 10px 14px; position:relative; overflow:hidden; min-width:0; }
-  .tile::before { content:""; position:absolute; left:0; top:0; bottom:0; width:4px; background:var(--na); }
-  .tile.ok::before { background:var(--ok); }
-  .tile.warn::before { background:var(--warn); }
-  .tile.bad::before { background:var(--bad); }
-  .tile .t { font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--dim); }
-  .tile .v { font-size:19px; font-weight:600; margin-top:2px; font-variant-numeric:tabular-nums;
-             white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .tile.warn .v { color:var(--warn); } .tile.bad .v { color:var(--bad); }
-  .tile .d { font-size:12.5px; color:var(--dim); margin-top:2px; font-variant-numeric:tabular-nums;
-             overflow-wrap:anywhere; white-space:pre-line; }
+  /* header */
+  header { display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between;
+           gap:10px 24px; padding:18px 0 14px; }
+  .id h1 { margin:0; font-size:22px; font-weight:650; letter-spacing:-.01em; }
+  .id .host { color:var(--ink-2); font-size:13px; margin-top:2px; }
+  .summary { text-align:right; }
+  .state { display:inline-flex; align-items:center; gap:8px; font-weight:600; font-size:15px; }
+  .state .glyph { width:20px; height:20px; border-radius:50%; display:inline-grid; place-items:center;
+                  color:#fff; font-size:12px; font-weight:700; background:var(--na); }
+  .state.ok .glyph { background:var(--good); }
+  .state.warn .glyph { background:var(--warn); color:#0b0b0b; }
+  .state.bad .glyph { background:var(--crit); }
+  .meta { color:var(--muted); font-size:12.5px; margin-top:3px; font-variant-numeric:tabular-nums; }
+  .meta.stale { color:var(--crit); }
 
-  #camera { margin:12px 16px 0; background:var(--card); border:1px solid var(--line);
-            border-radius:10px; padding:10px 12px; max-width:820px; }
-  #camera[hidden] { display:none; }
-  #camera h2 { font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--dim); margin:0 0 8px; }
+  /* section labels */
+  h2.sec { font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.08em;
+           color:var(--muted); margin:18px 0 8px; display:flex; gap:10px; align-items:baseline; }
+  h2.sec span { text-transform:none; letter-spacing:0; font-weight:400; }
+
+  /* tiles */
+  .strip { display:grid; gap:10px; grid-template-columns:repeat(auto-fit, minmax(128px, 1fr)); }
+  .tile { background:var(--surface); border-radius:10px; box-shadow:0 0 0 1px var(--ring);
+          padding:11px 13px 10px; min-width:0; display:flex; flex-direction:column; }
+  .tile .top { display:flex; justify-content:space-between; align-items:center; gap:6px; }
+  .tile .label { font-size:12.5px; color:var(--ink-2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .badge { font-size:11px; font-weight:600; display:inline-flex; align-items:center; gap:4px; color:var(--ink-2); white-space:nowrap; }
+  .badge i { font-style:normal; width:14px; height:14px; border-radius:50%; display:inline-grid; place-items:center;
+             font-size:9px; color:#fff; }
+  .badge.ok i { background:var(--good); } .badge.warn i { background:var(--warn); color:#0b0b0b; }
+  .badge.bad i { background:var(--crit); } .badge.na i { background:var(--na); }
+  .tile .detail .word { color:var(--ink); font-weight:600; }  /* caution / at limit, spelled out */
+  .tile .value { font-size:22px; font-weight:600; letter-spacing:-.01em; margin-top:4px; white-space:nowrap;
+                 overflow:hidden; text-overflow:ellipsis; }
+  .tile .value small { font-size:14px; font-weight:500; color:var(--ink-2); margin-left:3px; }
+  .tile .detail { font-size:12px; color:var(--muted); margin-top:1px; white-space:pre-line; overflow-wrap:anywhere; }
+  .tile .viz { margin-top:auto; padding-top:8px; position:relative; min-height:22px; }
+  .tile .viz svg { display:block; width:100%; }
+  .tile .viz .pt { position:absolute; width:8px; height:8px; border-radius:50%; right:-4px; }
+
+  /* charts */
+  .charts { display:grid; gap:12px; grid-template-columns:repeat(auto-fit, minmax(340px, 1fr)); }
+  .chart { background:var(--surface); border-radius:10px; box-shadow:0 0 0 1px var(--ring);
+           padding:12px 14px 8px; min-width:0; }
+  .chart h3 { margin:0; font-size:15px; font-weight:600; }
+  .chart .sub { color:var(--muted); font-size:12.5px; margin:2px 0 4px; font-variant-numeric:tabular-nums; min-height:1.4em; }
+  .legend { display:flex; gap:14px; font-size:12.5px; color:var(--ink-2); margin:2px 0 4px; }
+  .legend span { display:inline-flex; align-items:center; gap:6px; }
+  .legend i { width:14px; height:2px; border-radius:1px; display:inline-block; }
+  .plot { position:relative; }
+  .plot svg { display:block; width:100%; height:190px; overflow:visible; touch-action:pan-y; }
+  .tip { position:absolute; pointer-events:none; background:var(--surface); color:var(--ink);
+         box-shadow:0 0 0 1px var(--ring), 0 4px 14px rgba(0,0,0,.14); border-radius:8px;
+         padding:7px 9px; font-size:12.5px; white-space:nowrap; display:none; z-index:2; }
+  .tip .tt { color:var(--muted); margin-bottom:3px; font-variant-numeric:tabular-nums; }
+  .tip .row { display:flex; align-items:center; gap:7px; }
+  .tip .row i { width:8px; height:8px; border-radius:50%; display:inline-block; }
+  .tip .row b { margin-left:auto; padding-left:12px; font-weight:600; font-variant-numeric:tabular-nums; }
+  svg text { font:11px system-ui, -apple-system, "Segoe UI", sans-serif; fill:var(--muted); font-variant-numeric:tabular-nums; }
+  svg .endlabel { fill:var(--ink); font-weight:600; font-size:11.5px; }
+  svg .limitlabel { font-size:10.5px; }
+
+  /* camera (only when running with --camera) */
+  #camera { background:var(--surface); border-radius:10px; box-shadow:0 0 0 1px var(--ring);
+            padding:12px 14px; max-width:820px; }
   #camera img { width:100%; aspect-ratio:4/3; background:#000; border-radius:6px; display:block; }
 
-  footer { padding:12px 16px 18px; color:var(--dim); font-size:12px; }
+  /* table view */
+  details { margin-top:18px; background:var(--surface); border-radius:10px; box-shadow:0 0 0 1px var(--ring); }
+  summary { cursor:pointer; padding:10px 14px; font-size:13.5px; color:var(--ink-2); }
+  table { border-collapse:collapse; width:100%; font-size:13px; }
+  td, th { padding:6px 14px; border-top:1px solid var(--grid); text-align:left; }
+  th { color:var(--muted); font-weight:500; }
+  td.n { font-variant-numeric:tabular-nums; }
+  footer { color:var(--muted); font-size:12px; margin-top:16px; line-height:1.6; }
+  @media (max-width:520px) { .summary { text-align:left; } .charts { grid-template-columns:1fr; } }
 </style>
 </head>
 <body>
-<header><h1>Forrest Jr</h1><span id="updated">connecting…</span></header>
+<div class="wrap">
+<header>
+  <div class="id">
+    <h1>Forrest Jr</h1>
+    <div class="host" id="host">connecting…</div>
+  </div>
+  <div class="summary">
+    <div class="state" id="state"><span class="glyph">·</span><span id="state-text">waiting for first sample</span></div>
+    <div class="meta" id="meta"></div>
+  </div>
+</header>
+
+<h2 class="sec">Now <span>trend line = last 2 min</span></h2>
 <section class="strip" id="strip" aria-live="polite"></section>
-<section id="camera" hidden>
-  <h2>Camera · <span id="cam-fps"></span></h2>
-  <img id="view" alt="Live camera view with detection boxes">
+
+<section id="camera-wrap" hidden>
+  <h2 class="sec">Camera <span id="cam-fps"></span></h2>
+  <div id="camera"><img id="view" alt="Live camera view with detection boxes"></div>
 </section>
-<footer>Read-only · tailnet only · refreshes every 2 s</footer>
+
+<h2 class="sec">History <span id="hist-sub">last 30 min</span></h2>
+<section class="charts">
+  <div class="chart" id="c-temp">
+    <h3>Temperature</h3>
+    <div class="sub" data-sub></div>
+    <div class="legend" data-legend></div>
+    <div class="plot"><svg role="img" aria-label="CPU and AI HAT temperature, last 30 minutes"></svg><div class="tip"></div></div>
+  </div>
+  <div class="chart" id="c-cpu">
+    <h3>CPU load</h3>
+    <div class="sub" data-sub></div>
+    <div class="plot"><svg role="img" aria-label="CPU load, last 30 minutes"></svg><div class="tip"></div></div>
+  </div>
+  <div class="chart" id="c-net">
+    <h3>Network throughput</h3>
+    <div class="sub" data-sub></div>
+    <div class="legend" data-legend></div>
+    <div class="plot"><svg role="img" aria-label="Network receive and send, last 30 minutes"></svg><div class="tip"></div></div>
+  </div>
+</section>
+
+<details>
+  <summary>Readings table (every value, with units and source)</summary>
+  <table><thead><tr><th>Reading</th><th>Value</th><th>Source</th></tr></thead><tbody id="table"></tbody></table>
+</details>
+
+<footer id="footer">Read-only · tailnet only</footer>
+</div>
+
 <script>
-const strip = document.getElementById("strip");
-const updated = document.getElementById("updated");
+"use strict";
+const $ = id => document.getElementById(id);
+const NS = "http://www.w3.org/2000/svg";
+const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const STATE = { ok: ["✓", "nominal"], warn: ["▲", "caution"], bad: ["✕", "at limit"], na: ["–", "no data"] };
+const SPARK_N = 60;   // 60 samples x 2 s = 2 min
+
+let hist = null;       // columns from /api/history
+let limits = {};
 let lastOk = 0;
 
-function render(tiles) {
-  // build once, then update text in place so the strip doesn't flicker
+// ---------- helpers ----------
+function el(tag, attrs = {}, parent) {
+  const e = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+function niceStep(range, target) {
+  const raw = range / Math.max(target, 1), mag = 10 ** Math.floor(Math.log10(raw));
+  const n = raw / mag;
+  return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * mag;
+}
+function rate(b) {
+  if (b == null) return "–";
+  if (b >= 1e6) return (b / 1e6).toFixed(1) + " MB/s";
+  if (b >= 1e3) return (b / 1e3).toFixed(1) + " KB/s";
+  return Math.round(b) + " B/s";
+}
+const clock = t => new Date(t * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+const hm = t => new Date(t * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+function stats(arr) {
+  const v = arr.filter(x => x != null);
+  if (!v.length) return null;
+  return { min: Math.min(...v), max: Math.max(...v), mean: v.reduce((a, b) => a + b, 0) / v.length, n: v.length };
+}
+
+// ---------- tiles ----------
+// which history column draws each tile's trend; meters for ratios against a limit
+const TILE_VIZ = {
+  cpu: { spark: "cpu_pct", domain: [0, 100] },
+  cpu_temp: { spark: "cpu_temp" },
+  hailo: { spark: "hailo_temp" },
+  power: { spark: "input_v" },
+  fan: { spark: "fan_rpm" },
+  mem: { meter: "mem", limit: "mem_pct" },
+  disk: { meter: "disk", limit: "disk_pct" },
+  wlan0: { spark: "wifi_dbm" },
+};
+
+function splitValue(v) {
+  // "62.6 °C" -> ["62.6", "°C"], so the unit can be set smaller
+  const m = /^(-?[\d.,]+)\s*([^\d]*)$/.exec(v);   // only a pure unit is set small
+  return m ? [m[1], m[2]] : [v, ""];
+}
+
+function renderTiles(tiles, raw) {
+  const strip = $("strip");
   if (strip.children.length !== tiles.length) {
     strip.innerHTML = "";
     for (const _ of tiles) {
-      const el = document.createElement("div");
-      el.className = "tile";
-      el.innerHTML = '<div class="t"></div><div class="v"></div><div class="d"></div>';
-      strip.appendChild(el);
+      const d = document.createElement("div");
+      d.className = "tile";
+      d.innerHTML = '<div class="top"><span class="label"></span><span class="badge"><i></i></span></div>' +
+                    '<div class="value"></div><div class="detail"></div><div class="viz"></div>';
+      strip.appendChild(d);
     }
   }
   tiles.forEach((t, i) => {
-    const el = strip.children[i];
-    el.className = "tile " + t.level;
-    el.title = t.title + ": " + t.value + (t.detail ? " — " + t.detail : "");
-    el.children[0].textContent = t.title;
-    el.children[1].textContent = t.value;
-    el.children[2].textContent = t.detail || " ";
+    const d = strip.children[i];
+    const [glyph, word] = STATE[t.level] || STATE.na;
+    d.querySelector(".label").textContent = t.title;
+    const badge = d.querySelector(".badge");
+    badge.className = "badge " + t.level;
+    badge.querySelector("i").textContent = glyph;
+    badge.setAttribute("aria-label", word);
+    const [num, unit] = splitValue(t.value);
+    const v = d.querySelector(".value");
+    v.textContent = num;
+    if (unit) { const s = document.createElement("small"); s.textContent = unit; v.appendChild(s); }
+    const det = d.querySelector(".detail");
+    det.textContent = "";
+    if (t.level === "warn" || t.level === "bad") {
+      const w = document.createElement("span"); w.className = "word";
+      w.textContent = word[0].toUpperCase() + word.slice(1) + (t.detail ? " · " : "");
+      det.appendChild(w);
+    }
+    det.append(t.detail || (det.childElementCount ? "" : "\u00a0"));
+    d.title = `${t.title}: ${t.value} (${word})`;
+    drawTileViz(d.querySelector(".viz"), t, raw);
   });
 }
 
-function camera(v) {
-  const box = document.getElementById("camera");
-  const img = document.getElementById("view");
-  if (v && v.running) {
-    if (box.hidden) { box.hidden = false; img.src = "/stream"; }
-    document.getElementById("cam-fps").textContent = `${v.fps} fps`;
-  } else if (!box.hidden) {
-    box.hidden = true; img.removeAttribute("src");
+function drawTileViz(box, t, raw) {
+  const cfg = TILE_VIZ[t.key] || {};
+  box.innerHTML = "";
+  const W = 140, H = 22;
+  if (cfg.meter) {
+    // meter: fill = share used, track = lighter step of the same ramp, ticks at caution + limit
+    const pct = cfg.meter === "disk" ? raw.disk.used_pct : raw.memory?.used_pct;
+    if (pct == null) return;
+    const svg = el("svg", { viewBox: `0 0 ${W} 14`, height: 14, preserveAspectRatio: "none", "aria-hidden": "true" }, box);
+    const fill = t.level === "bad" ? css("--crit") : t.level === "warn" ? css("--warn") : css("--s1");
+    el("rect", { x: 0, y: 4, width: W, height: 6, rx: 3, fill: css("--track") }, svg);
+    el("rect", { x: 0, y: 4, width: Math.max(6, W * pct / 100), height: 6, rx: 3, fill }, svg);
+    for (const lim of (limits[cfg.limit] || []).slice(0, 2))
+      el("line", { x1: W * lim / 100, x2: W * lim / 100, y1: 1, y2: 13, stroke: css("--muted"), "stroke-width": 1, "vector-effect": "non-scaling-stroke" }, svg);
+    return;
   }
+  if (!cfg.spark || !hist) return;
+  const ys = hist[cfg.spark].slice(-SPARK_N);
+  const vals = ys.filter(v => v != null);
+  if (vals.length < 2) return;
+  let [lo, hi] = cfg.domain || [Math.min(...vals), Math.max(...vals)];
+  if (!cfg.domain) {
+    if (hi - lo < 1e-9) { lo -= 1; hi += 1; }
+    const pad = (hi - lo) * 0.15; lo -= pad; hi += pad;
+  }
+  const off = SPARK_N - ys.length;
+  const x = i => ((i + off) / (SPARK_N - 1)) * W;
+  const y = v => H - 3 - ((v - lo) / (hi - lo)) * (H - 6);
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, height: H, preserveAspectRatio: "none", "aria-hidden": "true" }, box);
+  let d = "", pen = false;
+  ys.forEach((v, i) => { if (v == null) { pen = false; return; } d += (pen ? "L" : "M") + x(i).toFixed(1) + "," + y(v).toFixed(1); pen = true; });
+  el("path", { d, fill: "none", stroke: css("--spark"), "stroke-width": 1.5, "stroke-linejoin": "round",
+               "stroke-linecap": "round", "vector-effect": "non-scaling-stroke" }, svg);
+  // current value: accent dot with a surface ring (HTML, so it stays round when the svg stretches)
+  const lv = ys[ys.length - 1];
+  if (lv != null) {
+    const pt = document.createElement("span");
+    pt.className = "pt";
+    pt.style.top = (8 + y(lv) - 4) + "px";
+    pt.style.background = css("--s1");
+    pt.style.boxShadow = `0 0 0 2px ${css("--surface")}`;
+    box.appendChild(pt);
+  }
+}
+
+// ---------- charts ----------
+function lineChart(root, { series, domain, fmt, limits: lims = [], area = false, minSpan = 1 }) {
+  const svg = root.querySelector("svg"), tip = root.querySelector(".tip");
+  const W = svg.clientWidth || 600, H = 190;
+  const M = { l: 40, r: 62, t: 10, b: 22 };
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.innerHTML = "";
+  const t = hist.t;
+  if (!t.length) return;
+  const now = t[t.length - 1], t0 = now - hist.window_s;
+  const X = v => M.l + ((v - t0) / (now - t0)) * (W - M.l - M.r);
+
+  // y domain: fixed when given, else from the data with clean bounds
+  let lo, hi;
+  if (domain) [lo, hi] = domain;
+  else {
+    const all = series.flatMap(s => hist[s.key]).filter(v => v != null);
+    lo = 0; hi = all.length ? Math.max(...all) : 1;
+    if (hi - lo < minSpan) hi = lo + minSpan;
+  }
+  const step = niceStep(hi - lo, 4);
+  lo = Math.floor(lo / step) * step; hi = Math.ceil(hi / step) * step;
+  const Y = v => M.t + (1 - (v - lo) / (hi - lo)) * (H - M.t - M.b);
+  const clampY = v => Y(Math.min(hi, Math.max(lo, v)));
+
+  // gridlines + y ticks (baseline one step darker)
+  for (let v = lo; v <= hi + 1e-9; v += step) {
+    el("line", { x1: M.l, x2: W - M.r, y1: Y(v), y2: Y(v), stroke: css(Math.abs(v - lo) < 1e-9 ? "--axis" : "--grid"), "stroke-width": 1 }, svg);
+    el("text", { x: M.l - 6, y: Y(v) + 3.5, "text-anchor": "end" }, svg).textContent = fmt(v, true);
+  }
+  // x ticks on clean 10-minute clock marks
+  for (let m = Math.ceil(t0 / 600) * 600; m <= now; m += 600)
+    el("text", { x: X(m), y: H - 6, "text-anchor": "middle" }, svg).textContent = hm(m);
+  // limit lines: hairline in the status colour, label in muted text
+  for (const L of lims) {
+    if (L.v < lo || L.v > hi) continue;
+    el("line", { x1: M.l, x2: W - M.r, y1: Y(L.v), y2: Y(L.v), stroke: css(L.color), "stroke-width": 1 }, svg);
+    el("text", { x: M.l + 4, y: Y(L.v) - 4, class: "limitlabel" }, svg).textContent = L.label;
+  }
+  // series: 2px lines, end dot r=4 with a 2px surface ring
+  const labels = [];
+  for (const s of series) {
+    const ys = hist[s.key];
+    let d = "", pen = false, first = null, lastI = null;
+    ys.forEach((v, i) => {
+      if (v == null) { pen = false; return; }
+      d += (pen ? "L" : "M") + X(t[i]).toFixed(1) + "," + clampY(v).toFixed(1);
+      if (first == null) first = i;
+      lastI = i; pen = true;
+    });
+    if (!d) continue;
+    if (area) el("path", { d: d + `L${X(t[lastI]).toFixed(1)},${Y(lo)}L${X(t[first]).toFixed(1)},${Y(lo)}Z`, fill: css("--s1-wash") }, svg);
+    el("path", { d, fill: "none", stroke: css(s.color), "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }, svg);
+    el("circle", { cx: X(t[lastI]), cy: clampY(ys[lastI]), r: 4, fill: css(s.color), stroke: css("--surface"), "stroke-width": 2 }, svg);
+    labels.push({ y: clampY(ys[lastI]), text: fmt(ys[lastI]) });
+  }
+  // direct end labels; if they would collide, leave it to the legend + tooltip
+  labels.sort((a, b) => a.y - b.y);
+  if (!labels.some((l, i) => i && l.y - labels[i - 1].y < 13))
+    for (const l of labels) el("text", { x: W - M.r + 9, y: l.y + 4, class: "endlabel" }, svg).textContent = l.text;
+
+  // hover: crosshair + tooltip; the hit target is the whole plot area
+  const cross = el("line", { y1: M.t, y2: H - M.b, stroke: css("--axis"), "stroke-width": 1, visibility: "hidden" }, svg);
+  const dots = series.map(s => el("circle", { r: 4, fill: css(s.color), stroke: css("--surface"), "stroke-width": 2, visibility: "hidden" }, svg));
+  const hit = el("rect", { x: M.l, y: M.t, width: W - M.l - M.r, height: H - M.t - M.b, fill: "transparent" }, svg);
+  const hide = () => { tip.style.display = "none"; cross.setAttribute("visibility", "hidden"); dots.forEach(d => d.setAttribute("visibility", "hidden")); };
+  const move = ev => {
+    const r = svg.getBoundingClientRect();
+    const px = (ev.clientX - r.left) * (W / r.width);
+    const tv = t0 + ((px - M.l) / (W - M.l - M.r)) * (now - t0);
+    let i = 0, best = Infinity;
+    for (let k = 0; k < t.length; k++) { const dd = Math.abs(t[k] - tv); if (dd < best) { best = dd; i = k; } }
+    if (best > 10) { hide(); return; }
+    const cx = X(t[i]);
+    cross.setAttribute("x1", cx); cross.setAttribute("x2", cx); cross.setAttribute("visibility", "visible");
+    tip.innerHTML = "";
+    const tt = document.createElement("div"); tt.className = "tt"; tt.textContent = clock(t[i]); tip.appendChild(tt);
+    series.forEach((s, k) => {
+      const v = hist[s.key][i];
+      if (v == null) { dots[k].setAttribute("visibility", "hidden"); return; }
+      dots[k].setAttribute("cx", cx); dots[k].setAttribute("cy", clampY(v)); dots[k].setAttribute("visibility", "visible");
+      const row = document.createElement("div"); row.className = "row";
+      const sw = document.createElement("i"); sw.style.background = css(s.color);
+      const b = document.createElement("b"); b.textContent = fmt(v);
+      row.append(sw, s.name, b); tip.appendChild(row);
+    });
+    tip.style.display = "block";
+    const tw = tip.offsetWidth, sx = cx * (r.width / W);
+    tip.style.left = (sx + 12 + tw > r.width ? Math.max(0, sx - tw - 12) : sx + 12) + "px";
+    tip.style.top = "6px";
+  };
+  hit.addEventListener("pointermove", move);
+  hit.addEventListener("pointerdown", move);
+  hit.addEventListener("pointerleave", hide);
+}
+
+function legend(root, series) {
+  const box = root.querySelector("[data-legend]");
+  box.innerHTML = "";
+  for (const s of series) {
+    const sp = document.createElement("span");
+    const i = document.createElement("i"); i.style.background = css(s.color);
+    sp.append(i, s.name);
+    box.appendChild(sp);
+  }
+}
+const sub = (root, text) => { root.querySelector("[data-sub]").textContent = text; };
+const deg = (v, tick) => tick ? `${Math.round(v)}°` : `${v.toFixed(1)} °C`;
+
+function drawCharts() {
+  if (!hist || !hist.t.length) return;
+  const [ta, tr] = limits.cpu_temp || [70, 80];
+  const tempS = [{ key: "cpu_temp", name: "CPU", color: "--s1" }, { key: "hailo_temp", name: "AI HAT", color: "--s2" }];
+  legend($("c-temp"), tempS);
+  lineChart($("c-temp"), {
+    series: tempS, domain: [30, 90], fmt: deg,
+    limits: [{ v: tr, label: `throttle ${tr} °C`, color: "--crit" }, { v: ta, label: `caution ${ta} °C`, color: "--warn" }],
+  });
+  const c = stats(hist.cpu_temp), h = stats(hist.hailo_temp);
+  sub($("c-temp"), [c && `CPU ${c.min.toFixed(1)}–${c.max.toFixed(1)} °C, mean ${c.mean.toFixed(1)}`,
+                    h && `AI HAT mean ${h.mean.toFixed(1)} °C`, c && `${(tr - c.max).toFixed(1)} °C headroom at peak`].filter(Boolean).join(" · "));
+
+  lineChart($("c-cpu"), {
+    series: [{ key: "cpu_pct", name: "CPU", color: "--s1" }], domain: [0, 100], area: true,
+    fmt: v => `${Math.round(v)}%`,
+  });
+  const u = stats(hist.cpu_pct);
+  sub($("c-cpu"), u ? `all 4 cores · mean ${u.mean.toFixed(1)}% · peak ${u.max.toFixed(0)}%` : "");
+
+  const netS = [{ key: "rx_bps", name: "Receive", color: "--s1" }, { key: "tx_bps", name: "Send", color: "--s2" }];
+  legend($("c-net"), netS);
+  lineChart($("c-net"), {
+    series: netS, minSpan: 1000,
+    fmt: (v, tick) => tick ? (v >= 1e6 ? (v / 1e6).toFixed(1) + "M" : v >= 1e3 ? Math.round(v / 1e3) + "K" : String(Math.round(v))) : rate(v),
+  });
+  const rx = stats(hist.rx_bps), tx = stats(hist.tx_bps);
+  sub($("c-net"), rx && tx ? `bytes per second · receive mean ${rate(rx.mean)} · send mean ${rate(tx.mean)}` : "");
+
+  const mins = Math.floor((hist.t[hist.t.length - 1] - hist.t[0]) / 60);
+  $("hist-sub").textContent = mins < hist.window_s / 60 - 1
+    ? `last 30 min · collecting since server start, ${mins} min so far` : "last 30 min";
+}
+
+// ---------- table + header ----------
+function renderTable(raw) {
+  const fx = (v, u) => v != null ? `${v} ${u}` : "–";
+  const rows = [
+    ["CPU load", fx(raw.cpu.pct, "%"), "/proc/stat"],
+    ["CPU clock", raw.cpu.ghz != null ? `${raw.cpu.ghz} GHz (max ${raw.cpu.max_ghz})` : "–", "/sys cpufreq"],
+    ["CPU temperature", fx(raw.cpu.temp_c, "°C"), "vcgencmd measure_temp"],
+    ["AI HAT temperature", fx(raw.hailo_temp_c, "°C"), "Hailo-8 on-chip sensor"],
+    ["Input voltage", fx(raw.power.input_v, "V"), "vcgencmd pmic_read_adc EXT5V_V"],
+    ["Throttle flags", raw.power.throttled || "–", "vcgencmd get_throttled"],
+    ["Fan", fx(raw.fan_rpm, "rpm"), "hwmon pwmfan"],
+    ["Memory used", raw.memory ? `${raw.memory.used_pct} % of ${raw.memory.total_mb} MB` : "–", "/proc/meminfo"],
+    ["Disk", `${raw.disk.free_gb} GB free of ${raw.disk.total_gb} GB`, "statvfs /"],
+    ...Object.entries(raw.network).map(([n, v]) => [n, `${v.ip}${v.signal_dbm != null ? ", " + v.signal_dbm + " dBm" : ""}, ↓ ${rate(v.rx_bps)} ↑ ${rate(v.tx_bps)}`, "/proc/net"]),
+    ["Tailscale", raw.tailscale ? `${raw.tailscale.state}, ${raw.tailscale.ip}` : "–", "tailscale status"],
+    ["Uptime", raw.uptime_s != null ? `${Math.round(raw.uptime_s)} s` : "–", "/proc/uptime"],
+  ];
+  const tb = $("table"); tb.innerHTML = "";
+  for (const [a, b, c] of rows) {
+    const tr = document.createElement("tr");
+    for (const [txt, cls] of [[a, ""], [b, "n"], [c, ""]]) {
+      const td = document.createElement("td"); td.textContent = txt; if (cls) td.className = cls; tr.appendChild(td);
+    }
+    tb.appendChild(tr);
+  }
+}
+
+function renderHeader(tiles, raw, time) {
+  const h = raw.host || {};
+  $("host").textContent = [h.model, "Hailo-8 AI HAT+", h.kernel && "kernel " + h.kernel].filter(Boolean).join(" · ");
+  const off = tiles.filter(t => t.level === "warn" || t.level === "bad");
+  const worst = off.some(t => t.level === "bad") ? "bad" : off.length ? "warn" : "ok";
+  const st = $("state");
+  st.className = "state " + worst;
+  st.querySelector(".glyph").textContent = STATE[worst][0];
+  const checked = tiles.filter(t => t.level !== "na").length;
+  $("state-text").textContent = worst === "ok"
+    ? `Nominal · ${checked} of ${checked} within limits`
+    : `${worst === "bad" ? "At limit" : "Caution"} · ${off.map(t => t.title).join(", ")}`;
+  $("meta").className = "meta";
+  $("meta").textContent = `sampled every ${hist?.every_s ?? 2} s · updated ${clock(time)}`;
+}
+
+function renderCamera(v) {
+  const wrap = $("camera-wrap"), img = $("view");
+  if (v && v.running) {
+    if (wrap.hidden) { wrap.hidden = false; img.src = "/stream"; }
+    $("cam-fps").textContent = `${v.fps} fps · ${v.model}`;
+  } else if (!wrap.hidden) { wrap.hidden = true; img.removeAttribute("src"); }
+}
+
+// ---------- polling ----------
+async function loadHistory() {
+  const since = hist && hist.t.length ? hist.t[hist.t.length - 1] : null;
+  const h = await (await fetch("/api/history" + (since ? `?since=${since}` : ""), { cache: "no-store" })).json();
+  if (!hist) { hist = h; return; }
+  const keep = Math.round(h.window_s / h.every_s);
+  for (const k of Object.keys(h)) if (Array.isArray(h[k])) hist[k] = hist[k].concat(h[k]).slice(-keep);
 }
 
 async function tick() {
   try {
-    const r = await fetch("/api/status", {cache: "no-store"});
-    const s = await r.json();
-    render(s.hardware.tiles);
-    camera(s.vision);
+    const [sr] = await Promise.all([fetch("/api/status", { cache: "no-store" }), loadHistory()]);
+    const s = await sr.json();
+    limits = s.limits || {};
+    const raw = s.hardware.raw;
+    renderTiles(s.hardware.tiles, raw);
+    renderHeader(s.hardware.tiles, raw, s.hardware.time);
+    renderTable(raw);
+    renderCamera(s.vision);
+    drawCharts();
+    const L = limits;
+    $("footer").textContent = `Read-only · tailnet only · limits — CPU temp: caution ${L.cpu_temp?.[0]} °C, throttle ${L.cpu_temp?.[1]} °C · ` +
+      `AI HAT: caution ${L.hailo_temp?.[0]} °C · Wi-Fi: caution below ${L.wifi_dbm?.[0]} dBm · input: caution below ${L.input_v?.[0]} V`;
     lastOk = Date.now();
-    updated.className = "";
-    updated.textContent = "updated " + new Date(s.hardware.time * 1000).toLocaleTimeString();
   } catch (e) {
     if (Date.now() - lastOk > 6000) {
-      updated.className = "stale";
-      updated.textContent = "not reachable — showing last values";
+      $("meta").className = "meta stale";
+      $("meta").textContent = "server not reachable — showing last values";
     }
   }
 }
+window.addEventListener("resize", () => { if (hist) drawCharts(); });
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", tick);
 tick(); setInterval(tick, 2000);
 </script>
 </body>

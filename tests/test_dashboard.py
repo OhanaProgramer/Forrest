@@ -60,7 +60,7 @@ def test_human_formats():
     assert st.human_rate(12_300) == "12.3 KB/s"
     assert st.human_rate(None) == "–"
     assert st.human_duration(125) == "2 min"
-    assert st.human_duration(3 * 3600 + 120) == "3 h 2 min"
+    assert st.human_duration(3 * 3600 + 120) == "3 h 2 m"
     assert st.human_duration(2 * 86400 + 5 * 3600) == "2 d 5 h"
 
 
@@ -83,9 +83,11 @@ def _raw(**over):
 
 def test_tiles_all_good():
     tiles = {t["key"]: t for t in st.tiles(_raw())}
-    assert list(tiles) == ["cpu", "hailo", "power", "fan", "mem", "disk", "wlan0", "tailscale", "uptime"]
+    assert list(tiles) == ["cpu", "cpu_temp", "hailo", "power", "fan", "mem", "disk",
+                           "wlan0", "tailscale", "uptime"]
     assert all(t["level"] == "ok" for t in tiles.values())
-    assert tiles["cpu"]["detail"] == "2.40 GHz · 58.0 °C"
+    assert tiles["cpu"]["detail"] == "2.40 of 2.40 GHz"
+    assert tiles["cpu_temp"]["detail"] == "22.0 °C below throttle"
     assert tiles["power"]["value"] == "all clear"
     assert tiles["power"]["detail"] == "input 5.15 V"
     assert tiles["wlan0"]["title"] == "Wi-Fi"
@@ -98,11 +100,22 @@ def test_tiles_flag_problems():
                       "problems": ["under-voltage has occurred", "throttling has occurred"]},
                tailscale=None, hailo_temp_c=None)
     tiles = {t["key"]: t for t in st.tiles(raw)}
-    assert tiles["cpu"]["level"] == "bad"            # hot, even though load is fine
+    assert tiles["cpu"]["level"] == "ok"             # load is fine...
+    assert tiles["cpu_temp"]["level"] == "bad"       # ...but it is hot
+    assert tiles["cpu_temp"]["detail"] == "at throttle limit"
     assert tiles["power"]["value"] == "seen since boot"
     assert tiles["power"]["level"] == "warn"
     assert tiles["hailo"]["level"] == "na"
     assert tiles["tailscale"]["level"] == "na"
+
+
+def test_sample_row_from_raw():
+    row = st.sample({**_raw(), "time": 100.04})
+    assert row == {"t": 100.0, "cpu_pct": 12.0, "cpu_temp": 58.0, "hailo_temp": 46.0,
+                   "input_v": 5.15, "fan_rpm": 4000, "mem_pct": 25.0, "wifi_dbm": -42.0,
+                   "rx_bps": 1500.0, "tx_bps": 300.0}
+    empty = st.sample({**_raw(network={}, memory=None), "time": 1})
+    assert empty["wifi_dbm"] is None and empty["rx_bps"] is None and empty["mem_pct"] is None
 
 
 def test_server_routes_without_camera():
@@ -117,6 +130,8 @@ def test_server_routes_without_camera():
         assert s["vision"]["running"] is False
         assert {"tiles", "raw", "time"} <= set(s["hardware"])
         assert "cpu_temp" in s["limits"]
+        h = json.loads(urllib.request.urlopen(base + "/api/history").read())
+        assert h["every_s"] == 2.0 and len(h["t"]) == len(h["cpu_temp"]) >= 1
         try:
             urllib.request.urlopen(base + "/stream")
             assert False, "stream should be 503 without a camera"

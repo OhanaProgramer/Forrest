@@ -11,7 +11,10 @@ Limits for green / amber / red live in LIMITS, the one place they are set.
 from __future__ import annotations
 
 import json
+import platform
 import re
+import socket
+from collections import deque
 import shutil
 import subprocess
 import threading
@@ -126,7 +129,7 @@ def human_duration(seconds: float) -> str:
     d, rem = divmod(int(seconds), 86400)
     h, rem = divmod(rem, 3600)
     m = rem // 60
-    return f"{d} d {h} h" if d else f"{h} h {m} min" if h else f"{m} min"
+    return f"{d} d {h} h" if d else f"{h} h {m} m" if h else f"{m} min"
 
 
 # -- readers -----------------------------------------------------------------
@@ -190,23 +193,89 @@ class _Cached:
         return self.value
 
 
+# what the history keeps per sample (compact; the charts and sparklines use it)
+SERIES = ("cpu_pct", "cpu_temp", "hailo_temp", "input_v", "fan_rpm", "mem_pct",
+          "wifi_dbm", "rx_bps", "tx_bps")
+
+
+def sample(raw: dict) -> dict:
+    """One reading -> one history row (None where a value is missing)."""
+    nets = raw["network"].values()
+    def total(key):
+        vals = [n[key] for n in nets if n[key] is not None]
+        return round(sum(vals), 1) if vals else None
+    wifi = [n["signal_dbm"] for n in nets if n["signal_dbm"] is not None]
+    return {
+        "t": round(raw["time"], 1),
+        "cpu_pct": raw["cpu"]["pct"],
+        "cpu_temp": raw["cpu"]["temp_c"],
+        "hailo_temp": raw["hailo_temp_c"],
+        "input_v": raw["power"]["input_v"],
+        "fan_rpm": raw["fan_rpm"],
+        "mem_pct": raw["memory"]["used_pct"] if raw["memory"] else None,
+        "wifi_dbm": wifi[0] if wifi else None,
+        "rx_bps": total("rx_bps"),
+        "tx_bps": total("tx_bps"),
+    }
+
+
 class Monitor:
-    """Reads hardware state on request (only while a page is open)."""
+    """Samples hardware every `every` seconds in a background thread and keeps
+    `history_s` seconds of history, so trends exist as soon as a page opens.
+    Cost on forrest-jr: about half a percent of one core."""
 
     PHYSICAL = ("wlan0", "eth0")
 
-    def __init__(self, disk_path: str = "/"):
+    def __init__(self, disk_path: str = "/", every: float = 2.0, history_s: float = 1800):
         self.disk_path = disk_path
+        self.every = every
+        self.history: deque = deque(maxlen=int(history_s / every))
+        self._latest: Optional[dict] = None
+        self._thread: Optional[threading.Thread] = None
         self._lock = threading.Lock()
         self._prev_cpu: Optional[tuple[int, int]] = None
         self._prev_net: Optional[tuple[float, dict]] = None
         self._hailo = _Cached(read_hailo_temp, 10)
         self._tailscale = _Cached(read_tailscale, 10)
+        self._host = {"name": socket.gethostname(),
+                      "model": (_read("/proc/device-tree/model") or "").strip("\x00\n ") or None,
+                      "kernel": platform.release()}
         self._volt = _Cached(lambda: parse_pmic_volt(_run("vcgencmd", "pmic_read_adc", "EXT5V_V") or ""), 5)
 
-    def read(self) -> dict:
+    def start(self) -> "Monitor":
+        if self._thread is None:
+            self._thread = threading.Thread(target=self._run, daemon=True, name="monitor")
+            self._thread.start()
+        return self
+
+    def _run(self) -> None:
+        nxt = time.time()
+        while True:
+            self._sample_once()
+            nxt += self.every
+            time.sleep(max(0.0, nxt - time.time()))
+
+    def _sample_once(self) -> dict:
+        r = self._read()
         with self._lock:
-            return self._read()
+            self._latest = r
+            self.history.append(sample(r["raw"]))
+        return r
+
+    def read(self) -> dict:
+        """The latest reading (taken now if the sampler hasn't run yet)."""
+        with self._lock:
+            latest = self._latest
+        return latest if latest is not None else self._sample_once()
+
+    def history_columns(self, since: Optional[float] = None) -> dict:
+        """History as columns: {'t': [...], 'cpu_temp': [...], ...}; only rows
+        newer than `since` when given (the page fetches the full window once,
+        then just the new rows)."""
+        with self._lock:
+            rows = [r for r in self.history if since is None or r["t"] > since]
+        return {"every_s": self.every, "window_s": self.history.maxlen * self.every,
+                **{k: [r[k] for r in rows] for k in ("t",) + SERIES}}
 
     def _read(self) -> dict:
         now = time.time()
@@ -262,6 +331,7 @@ class Monitor:
 
         up = _read("/proc/uptime")
         raw["uptime_s"] = parse_uptime(up) if up else None
+        raw["host"] = self._host
         return {"time": now, "tiles": tiles(raw), "raw": raw}
 
 
@@ -274,12 +344,16 @@ def tiles(raw: dict) -> list[dict]:
 
     out = []
     c = raw["cpu"]
-    out.append(tile("cpu", "CPU",
+    out.append(tile("cpu", "CPU load",
                     f"{c['pct']:.0f}%" if c["pct"] is not None else "–",
-                    " · ".join(x for x in (
-                        f"{c['ghz']:.2f} GHz" if c["ghz"] else None,
-                        f"{c['temp_c']:.1f} °C" if c["temp_c"] is not None else None) if x),
-                    worst(level("cpu_pct", c["pct"]), level("cpu_temp", c["temp_c"]))))
+                    (f"{c['ghz']:.2f} of {c['max_ghz']:.2f} GHz" if c["ghz"] and c["max_ghz"] else ""),
+                    level("cpu_pct", c["pct"])))
+    ct = c["temp_c"]
+    throttle_at = LIMITS["cpu_temp"][1]
+    out.append(tile("cpu_temp", "CPU temp", f"{ct:.1f} °C" if ct is not None else "–",
+                    (f"{throttle_at - ct:.1f} °C below throttle" if ct is not None and ct < throttle_at
+                     else "at throttle limit" if ct is not None else ""),
+                    level("cpu_temp", ct)))
 
     h = raw["hailo_temp_c"]
     out.append(tile("hailo", "AI HAT", f"{h:.1f} °C" if h is not None else "–",
@@ -315,7 +389,7 @@ def tiles(raw: dict) -> list[dict]:
         label = "Wi-Fi" if name.startswith("wl") else "Ethernet"
         sig = n["signal_dbm"]
         value = f"{sig:.0f} dBm" if sig is not None else "connected"
-        detail = f"{n['ip']}\n↓ {human_rate(n['rx_bps'])}  ↑ {human_rate(n['tx_bps'])}"
+        detail = n["ip"] or ""  # rates live in the network chart and the table
         out.append(tile(name, label, value, detail,
                         level("wifi_dbm", sig) if sig is not None else "ok"))
 

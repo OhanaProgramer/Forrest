@@ -3,6 +3,7 @@
     /              the dashboard page
     /stream        live annotated view (MJPEG)
     /api/status    hardware status + vision status (JSON)
+    /api/history   the last 30 min of samples, as columns (JSON)
 
 Read-only by design: nothing here moves hardware. Bind it to the Tailscale
 address so it is reachable from the tailnet only.
@@ -33,7 +34,7 @@ def tailscale_ip() -> Optional[str]:
 
 def make_handler(vision):
     """`vision` is a VisionLoop, or None to run without a camera (the default)."""
-    monitor = Monitor()
+    monitor = Monitor().start()
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, fmt, *args):  # keep the terminal quiet
@@ -56,6 +57,11 @@ def make_handler(vision):
                         "vision": vision.status() if vision else {"running": False,
                                                                   "error": "camera off (start with --camera)"}}
                 self._send(200, json.dumps(body).encode(), "application/json")
+            elif path == "/api/history":
+                q = self.path.partition("?")[2]
+                since = float(q.split("since=", 1)[1].split("&")[0]) if "since=" in q else None
+                self._send(200, json.dumps(monitor.history_columns(since)).encode(),
+                           "application/json")
             elif path == "/stream":
                 self._stream()
             else:
