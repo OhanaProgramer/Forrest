@@ -60,5 +60,3 @@ Thumbs.db
 data/**/*.jsonl
 data/**/*.csv
 *.egg-info/
-firmware/hoverboard/build/
-firmware/hoverboard/reference_stm32/build/
