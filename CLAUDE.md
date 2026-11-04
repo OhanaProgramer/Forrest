@@ -16,3 +16,13 @@
 - **Plain language for Jacque:** explain what a concept decides, where it
   shows up and what breaks without it; run the numbers yourself.
 - Python 3.11+ (the Pi runs Raspberry Pi OS Trixie, Python 3.13), venv in `.venv`.
+
+## Session hand-off (MacBook ⇄ forrest-jr, via `HANDOFF.md`)
+- **"start session"**: `git pull`; read "Resume here" in `HANDOFF.md` and any
+  items tagged for this machine. On the MacBook, also apply the queued
+  Continuity edits.
+- **"end session"**: update "Resume here" (done, running, open, to-dos for the
+  other machine); stop anything holding the camera or Hailo and say what was
+  left running; commit as `HANDOFF: end of session YYYY-MM-DD (<machine>)`;
+  push; confirm the push reached origin.
+- Find the last hand-off: `git log --grep "end of session" -1`.

@@ -18,6 +18,7 @@ finished items are deleted from here.
 ## Resume here (end of day 2026-11-04)
 - Done today: hoverboard removed; camera + Hailo verified (29.9 fps); `forrest view`
   window; dashboard steps 1-2 at http://100.123.84.14:8090/ (dark, tailnet only).
+- Left running: `forrest dash` (status only, no camera). Camera and Hailo are free.
 - Start it: `cd ~/Projects/02_builds/forrest && .venv/bin/forrest dash`
   (add `--camera` for detections; then `forrest view` can't run at the same time).
   It does not start at boot yet, so after a reboot run it by hand.
