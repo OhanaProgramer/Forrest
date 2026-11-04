@@ -1,0 +1,17 @@
+# Forrest dashboard (status only, no camera) as a systemd *user* service.
+# Install: pi/systemd/install-dash.sh   (needs linger so it starts at boot without a login)
+[Unit]
+Description=Forrest dashboard (forrest dash, tailnet only)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+WorkingDirectory=%h/Projects/02_builds/forrest
+# Pin the Tailscale IP: without it, a boot before Tailscale is up would fall back to 127.0.0.1.
+# Until tailscale0 has the address the bind fails and systemd retries every 5 s.
+ExecStart=%h/Projects/02_builds/forrest/.venv/bin/forrest dash --host 100.123.84.14 --port 8090
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

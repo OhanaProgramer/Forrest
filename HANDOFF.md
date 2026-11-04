@@ -18,12 +18,12 @@ finished items are deleted from here.
 ## Resume here (end of day 2026-11-04)
 - Done today: hoverboard removed; camera + Hailo verified (29.9 fps); `forrest view`
   window; dashboard steps 1-2 at http://100.123.84.14:8090/ (dark, tailnet only).
-- Left running: `forrest dash` (status only, no camera). Camera and Hailo are free.
-- Start it: `cd ~/Projects/02_builds/forrest && .venv/bin/forrest dash`
-  (add `--camera` for detections; then `forrest view` can't run at the same time).
-  It does not start at boot yet, so after a reboot run it by hand.
+- `forrest dash` (status only, no camera) now **starts at boot** as the user service
+  `forrest-dash` (`pi/systemd/`, linger on). Camera and Hailo are free.
+  Control: `systemctl --user status|restart|stop forrest-dash`; logs: `journalctl --user -u forrest-dash`.
+  For detections, stop the service and run `.venv/bin/forrest dash --camera` by hand.
 - Open: green cast on the ov5647 (white measures about R 98 / G 168 / B 166);
-  detection log; camera panel on the page; start at boot.
+  detection log; camera panel on the page.
 - Mac to-do: the Continuity edits below. The hoverboard "why" still needs Jacque.
 
 ## Now (forrest-jr, from 2026-11-04)
@@ -50,7 +50,11 @@ finished items are deleted from here.
      hover readouts; readings table with sources; light + dark. Server samples
      every 2 s in the background (30-min ring buffer, `/api/history`).
      Palette: dataviz reference palette, validated in-browser (no Node needed).
-   - Next, one at a time: camera panel, detection log, start at boot.
+   - **Done 2026-11-04, start at boot:** user service `forrest-dash` (pi/systemd/,
+     install with `pi/systemd/install-dash.sh`). Binds the pinned Tailscale IP and
+     retries every 5 s until tailscale0 is up (no silent 127.0.0.1 fallback).
+     Verified running + HTTP 200; not yet proven across a real reboot.
+   - Next, one at a time: camera panel, detection log.
 
 ## Open
 
