@@ -15,6 +15,16 @@ finished items are deleted from here.
 5. Who edits code: either machine may change this repo. Hardware drivers and
    bench runs are done on forrest-jr; say in the item which machine owns a change.
 
+## Resume here (end of day 2026-11-04)
+- Done today: hoverboard removed; camera + Hailo verified (29.9 fps); `forrest view`
+  window; dashboard steps 1-2 at http://100.123.84.14:8090/ (dark, tailnet only).
+- Start it: `cd ~/Projects/02_builds/forrest && .venv/bin/forrest dash`
+  (add `--camera` for detections; then `forrest view` can't run at the same time).
+  It does not start at boot yet, so after a reboot run it by hand.
+- Open: green cast on the ov5647 (white measures about R 98 / G 168 / B 166);
+  detection log; camera panel on the page; start at boot.
+- Mac to-do: the Continuity edits below. The hoverboard "why" still needs Jacque.
+
 ## Now (forrest-jr, from 2026-11-04)
 1. **HAT + camera ops test** on the Pi (Hailo-8 + ov5647): live detection runs,
    frame rate and temperature are measured, and results are logged here.
