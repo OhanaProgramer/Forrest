@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Forrest Jr</title>
+<style>
+  :root { --bg:#f6f7f8; --card:#fff; --ink:#1d2328; --dim:#68737d; --line:#e1e5e8;
+          --ok:#1f8a4c; --warn:#b7791f; --bad:#c53030; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#111417; --card:#1a1f24; --ink:#e6eaee; --dim:#8b969f; --line:#2a3138; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+         font:15px/1.4 system-ui, -apple-system, sans-serif; }
+  header { padding:14px 16px; display:flex; align-items:baseline; gap:12px; }
+  header h1 { font-size:18px; margin:0; }
+  header .sub { color:var(--dim); font-size:13px; }
+  main { display:grid; gap:12px; padding:0 16px 16px;
+         grid-template-columns: minmax(0,2fr) minmax(0,1fr); }
+  @media (max-width: 760px) { main { grid-template-columns: 1fr; } }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px 14px; }
+  .card h2 { font-size:13px; text-transform:uppercase; letter-spacing:.05em; color:var(--dim); margin:0 0 8px; }
+  #view { width:100%; aspect-ratio:4/3; background:#000; border-radius:6px; display:block; object-fit:contain; }
+  #viewmsg { color:var(--dim); font-size:13px; margin-top:6px; }
+  dl { display:grid; grid-template-columns:auto 1fr; gap:4px 12px; margin:0; }
+  dt { color:var(--dim); } dd { margin:0; font-variant-numeric:tabular-nums; text-align:right; }
+  .ok { color:var(--ok); } .warn { color:var(--warn); } .bad { color:var(--bad); }
+  .side { display:grid; gap:12px; align-content:start; }
+  ul.dets { list-style:none; margin:0; padding:0; }
+  ul.dets li { display:flex; justify-content:space-between; padding:3px 0; border-bottom:1px solid var(--line); }
+  ul.dets li:last-child { border-bottom:0; }
+  .none { color:var(--dim); }
+</style>
+</head>
+<body>
+<header><h1>Forrest Jr</h1><span class="sub" id="updated">connecting…</span></header>
+<main>
+  <section class="card">
+    <h2>Camera · live detections</h2>
+    <img id="view" src="/stream" alt="Live camera view with detection boxes">
+    <div id="viewmsg"></div>
+  </section>
+  <div class="side">
+    <section class="card">
+      <h2>Vision</h2>
+      <dl>
+        <dt>State</dt><dd id="v-state">–</dd>
+        <dt>Detection rate</dt><dd id="v-fps">–</dd>
+        <dt>Frames</dt><dd id="v-frames">–</dd>
+        <dt>Model</dt><dd id="v-model">–</dd>
+      </dl>
+    </section>
+    <section class="card">
+      <h2>In view now</h2>
+      <ul class="dets" id="dets"><li class="none">–</li></ul>
+    </section>
+    <section class="card">
+      <h2>Pi hardware</h2>
+      <dl>
+        <dt>Temperature</dt><dd id="h-temp">–</dd>
+        <dt>Power / throttle</dt><dd id="h-thr">–</dd>
+        <dt>Load (1 / 5 min)</dt><dd id="h-load">–</dd>
+        <dt>Memory used</dt><dd id="h-mem">–</dd>
+        <dt>Disk free</dt><dd id="h-disk">–</dd>
+        <dt>Uptime</dt><dd id="h-up">–</dd>
+      </dl>
+    </section>
+  </div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+function set(id, text, cls) { const el = $(id); el.textContent = text; el.className = cls || ""; }
+function dur(s) { const h = Math.floor(s/3600), m = Math.floor(s%3600/60); return h ? `${h} h ${m} min` : `${m} min`; }
+
+async function tick() {
+  try {
+    const r = await fetch("/api/status", {cache: "no-store"});
+    const {hardware: h, vision: v} = await r.json();
+    set("updated", "updated " + new Date(h.time * 1000).toLocaleTimeString());
+
+    set("v-state", v.running ? "running" : (v.error || "stopped"), v.running ? "ok" : "bad");
+    set("v-fps", v.fps != null ? `${v.fps} fps` : "–", v.fps >= 28 ? "ok" : v.fps > 0 ? "warn" : "");
+    set("v-frames", v.frames != null ? v.frames.toLocaleString() : "–");
+    set("v-model", v.model || "–");
+    const ul = $("dets"); ul.innerHTML = "";
+    const dets = v.detections || [];
+    if (!dets.length) ul.innerHTML = '<li class="none">nothing above threshold</li>';
+    for (const d of dets) {
+      const li = document.createElement("li");
+      li.innerHTML = `<span></span><span></span>`;
+      li.children[0].textContent = d.label;
+      li.children[1].textContent = Math.round(d.score * 100) + "%";
+      ul.appendChild(li);
+    }
+
+    const t = h.temp_c;
+    set("h-temp", t != null ? `${t.toFixed(1)} °C` : "–", t == null ? "" : t < 70 ? "ok" : t < 80 ? "warn" : "bad");
+    if (h.throttled) set("h-thr", h.throttled.ok ? "all clear" : h.throttled.problems.join("; "), h.throttled.ok ? "ok" : "bad");
+    if (h.load) set("h-load", `${h.load[0].toFixed(2)} / ${h.load[1].toFixed(2)}`);
+    if (h.memory) set("h-mem", `${h.memory.used_pct}%`);
+    set("h-disk", `${h.disk.free_gb} GB (${(100 - h.disk.used_pct).toFixed(0)}%)`, h.disk.used_pct > 90 ? "bad" : "");
+    if (h.uptime_s != null) set("h-up", dur(h.uptime_s));
+  } catch (e) {
+    set("updated", "server not reachable", "bad");
+  }
+}
+$("view").onerror = () => { $("viewmsg").textContent = "No live view (camera not running)."; };
+tick(); setInterval(tick, 2000);
+</script>
+</body>
+</html>

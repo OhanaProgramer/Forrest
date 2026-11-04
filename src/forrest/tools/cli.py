@@ -5,6 +5,8 @@
     forrest lidar view   [--replay FILE.jsonl]  # plot (needs the [viz] extra)
     forrest soak         [--minutes 60]         # B2: LIDAR spinning + power log
     forrest power                               # one-shot Pi power/heat check
+    forrest view [--threshold 0.5]              # desktop window: live view + boxes
+    forrest dash [--host H] [--port 8090] [--no-camera]   # dashboard web server
 """
 
 from __future__ import annotations
@@ -178,6 +180,70 @@ def cmd_power(args) -> int:
 
 
 # ---------------------------------------------------------------------------
+# dash  (dashboard web server; owns the camera + Hailo while it runs)
+# ---------------------------------------------------------------------------
+
+def cmd_view(args) -> int:
+    """Desktop window on the Pi: live view, boxes, fps and temperature. q or Esc quits."""
+    import cv2
+    from forrest.drivers.camera_hailo import VisionLoop
+    vision = VisionLoop(threshold=args.threshold, view_size=(960, 720), view_fps=15,
+                        encode_jpeg=False)
+    vision.start()
+    win = "Forrest Jr - camera + Hailo"
+    cv2.namedWindow(win, cv2.WINDOW_NORMAL)
+    cv2.resizeWindow(win, 960, 720)
+    seq, last_temp, temp = 0, 0.0, None
+    try:
+        while vision.is_alive():
+            with vision.new_frame:
+                vision.new_frame.wait_for(lambda: vision.jpeg_seq != seq, timeout=1)
+                img, seq = vision.latest_view, vision.jpeg_seq
+            if img is not None:
+                if time.time() - last_temp > 2:
+                    temp, last_temp = read_temp_c(), time.time()
+                st = vision.status()
+                line = f"{st['fps']:.1f} fps   {temp if temp is not None else '-'} C   threshold {st['threshold']}"
+                frame = img.copy()
+                cv2.putText(frame, line, (10, frame.shape[0] - 12), cv2.FONT_HERSHEY_SIMPLEX,
+                            0.6, (255, 255, 255), 2)
+                cv2.imshow(win, frame)
+            if cv2.waitKey(1) & 0xFF in (ord("q"), 27):
+                break
+            if cv2.getWindowProperty(win, cv2.WND_PROP_VISIBLE) < 1:
+                break  # window closed with the X button
+        err = vision.status()["error"]
+        if err:
+            print(f"vision stopped: {err}")
+            return 1
+    finally:
+        vision.stop()
+        vision.join(timeout=5)
+        cv2.destroyAllWindows()
+    return 0
+
+
+def cmd_dash(args) -> int:
+    from forrest.dashboard.server import serve, tailscale_ip
+    host = args.host or tailscale_ip() or "127.0.0.1"
+    vision = None
+    if not args.no_camera:
+        from forrest.drivers.camera_hailo import VisionLoop
+        vision = VisionLoop(threshold=args.threshold)
+        vision.start()
+    httpd = serve(host, args.port, vision)
+    print(f"dashboard: http://{host}:{args.port}/   (Ctrl-C to stop)")
+    try:
+        httpd.serve_forever()
+    finally:
+        httpd.server_close()
+        if vision:
+            vision.stop()
+            vision.join(timeout=5)
+    return 0
+
+
+# ---------------------------------------------------------------------------
 
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(prog="forrest", description=__doc__,
@@ -212,6 +278,17 @@ def main(argv=None) -> int:
 
     pw = sub.add_parser("power", help="one-shot Pi power and heat check")
     pw.set_defaults(func=cmd_power)
+
+    vw = sub.add_parser("view", help="desktop window on the Pi: live view + detections")
+    vw.add_argument("--threshold", type=float, default=0.5, help="minimum detection score")
+    vw.set_defaults(func=cmd_view)
+
+    d = sub.add_parser("dash", help="dashboard web server (camera, detections, Pi status)")
+    d.add_argument("--host", help="bind address (default: this Pi's Tailscale IP)")
+    d.add_argument("--port", type=int, default=8090)
+    d.add_argument("--threshold", type=float, default=0.5, help="minimum detection score")
+    d.add_argument("--no-camera", action="store_true", help="status only (Mac, or camera busy)")
+    d.set_defaults(func=cmd_dash)
 
     args = p.parse_args(argv)
     try:
