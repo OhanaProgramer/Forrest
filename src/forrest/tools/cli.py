@@ -268,11 +268,15 @@ def cmd_pico_check(args) -> int:
                   "Stop it first, e.g. `systemctl --user stop forrest-pico` or close mpremote.")
         return 1
     answered, rtts = 0, []
-    with pico:
-        print(f"Pico on {pico.port}. Polling status {args.polls}x (read-only, no drive commands).")
+    print(f"Pico on {pico.port}. Polling status {args.polls}x (read-only, no drive commands).")
+    try:
         for i in range(args.polls):
             t0 = time.monotonic()
-            stat = pico.status()
+            try:
+                stat = pico.status()
+            except OSError as e:          # unplugged mid-run (SerialException is an OSError)
+                print(f"  {i + 1}: link lost: {e}")
+                break
             for ev in list(pico.events):
                 print(f"  event: {ev.text}")
             pico.events.clear()
@@ -288,6 +292,11 @@ def cmd_pico_check(args) -> int:
                       f"loop gap {f['max_gap_ms']} ms  trips {f.get('trips', '?')}")
             if i + 1 < args.polls:
                 time.sleep(args.every)
+    finally:
+        try:
+            pico.close()
+        except OSError:
+            pass
     rtts.sort()
     rtt = f", round trip {rtts[len(rtts) // 2]:.1f} ms median" if rtts else ""
     print(f"Link {'UP' if answered == args.polls else 'DOWN' if not answered else 'FLAKY'}: "
