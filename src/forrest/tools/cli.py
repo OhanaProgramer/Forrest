@@ -8,6 +8,7 @@
     forrest view [--threshold 0.5]              # desktop window: live view + boxes
     forrest dash [--host H] [--port 8090] [--camera]      # dashboard web server
     forrest pico check [--port P] [--polls 5]   # is the Pico answering? (read-only)
+    forrest pico monitor [--every 1]            # forrest-pico service: state file + daily log
 """
 
 from __future__ import annotations
@@ -304,6 +305,19 @@ def cmd_pico_check(args) -> int:
     return 0 if answered == args.polls else 1
 
 
+def cmd_pico_monitor(args) -> int:
+    from pathlib import Path as _P
+
+    from forrest.health import pico_monitor as pm
+
+    state = _P(args.state) if args.state else pm.default_state_path()
+    print(f"Pico monitor (read-only). State: {state}  Log: {args.log_dir}/pico_YYYYMMDD.jsonl  "
+          f"Poll every {args.every} s. Ctrl-C to stop.", flush=True)
+    pm.run(state, _P(args.log_dir), every_s=args.every,
+           say=lambda line: print(line, flush=True))
+    return 0
+
+
 # ---------------------------------------------------------------------------
 
 def main(argv=None) -> int:
@@ -359,6 +373,11 @@ def main(argv=None) -> int:
     pc.add_argument("--polls", type=int, default=5)
     pc.add_argument("--every", type=float, default=1.0, help="seconds between polls")
     pc.set_defaults(func=cmd_pico_check)
+    pm = psub.add_parser("monitor", help="watch the Pico; write state for the dashboard + a daily log")
+    pm.add_argument("--every", type=float, default=1.0, help="seconds between polls")
+    pm.add_argument("--state", help="state file (default: $XDG_RUNTIME_DIR/forrest/pico.json)")
+    pm.add_argument("--log-dir", default="data/pico")
+    pm.set_defaults(func=cmd_pico_monitor)
 
     args = p.parse_args(argv)
     try:

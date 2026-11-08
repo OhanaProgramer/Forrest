@@ -1,0 +1,16 @@
+# Forrest Pico monitor as a systemd *user* service. Read-only: polls the Pico's
+# status, never sends drive commands. Writes $XDG_RUNTIME_DIR/forrest/pico.json
+# (for forrest-dash) and data/pico/pico_YYYYMMDD.jsonl.
+# Install: pi/systemd/install-pico.sh   (linger is already on for forrest-dash)
+# While it runs it holds the Pico's port: stop it before mpremote / deploy.sh.
+[Unit]
+Description=Forrest Pico monitor (forrest pico monitor, read-only)
+
+[Service]
+WorkingDirectory=%h/Projects/02_builds/forrest
+ExecStart=%h/Projects/02_builds/forrest/.venv/bin/forrest pico monitor
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

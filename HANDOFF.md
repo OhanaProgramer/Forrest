@@ -94,7 +94,17 @@ finished items are deleted from here.
         (`tests/test_pico_driver.py`). `forrest pico check` = read-only poll; on the
         board: link UP, ~6-7 ms round trip. The udev rule (b) is no longer needed for
         finding the port; skip it unless a second Pico appears.
-     d. `forrest-pico` user service: the only program that opens the port. It
+        Jacque ran the step-1 checks on the board 2026-11-08: all good.
+     d. **Built 2026-11-08, not installed yet:** `forrest pico monitor`
+        (`src/forrest/health/pico_monitor.py`, 7 tests). Polls `?` once a second (read-only);
+        link down after 3 s without an answer; reconnects by itself after an unplug.
+        State: `$XDG_RUNTIME_DIR/forrest/pico.json`, replaced atomically each poll. It
+        stays behind when the monitor stops, so readers must treat an old `updated` as
+        "monitor not running". Log: `data/pico/pico_YYYYMMDD.jsonl` (events + link
+        changes + a sample every 10 s, ~1.3 MB/day). Ran 8 s on the board: 8/8 answered,
+        ~5 ms. Service: `pi/systemd/forrest-pico.service`, install with
+        `pi/systemd/install-pico.sh`. Once installed, stop it before mpremote/deploy.sh.
+        Original plan for d: the `forrest-pico` user service, the only program that opens the port. It
         polls `?` (STAT) and logs every line to `data/`. It writes the latest
         state to a file for the dashboard. It does **not** send drive commands,
         so the Pico stays in failsafe.
