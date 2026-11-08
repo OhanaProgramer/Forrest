@@ -65,11 +65,26 @@ finished items are deleted from here.
      `/dev/ttyACM0`. On the board: the bench firmware (`main.py`) + `protocol.py`.
      Boot output: `READY`, then `FAILSAFE 1499901`, which means throttle cut to
      neutral (1.5 ms) 500 ms after boot with no commands. That is the correct behaviour.
-   - **Done 2026-11-08:** copied both files off the board into the repo, at the
-     paths their headers name: `firmware/pico/drive/protocol.py`,
-     `firmware/pico/drive/bench/main.py`. Nothing is wired to GP0/GP1.
+   - **Done 2026-11-08:** copied both files off the board into the repo. The MacBook's
+     2026-11-05 drive files were learning tests and are no longer used (Jacque); the
+     repo copy is the source now.
+   - **Done 2026-11-08, firmware split into modules** (`firmware/pico/drive/`):
+     `comm.py` (non-blocking serial: assembles whole lines, never waits on a half
+     line; drops lines over 64 chars), `heartbeat.py` (Pi-is-alive watchdog),
+     `protocol.py` (parse + pulse mapping), `main.py` (pins + loop). Pure parts have
+     host tests (`tests/test_pico_{comm,heartbeat,protocol}.py`, 34 tests pass).
+     `STAT` now ends with `trips` (failsafe trips since boot). Deploy:
+     `firmware/pico/deploy.sh` (mpremote, in `.venv`). Deployed and on the board.
+   - **Bench, 2026-11-08, on the board (no ESC/servo):** split lines are assembled,
+     bad and over-long lines are rejected, `?` does not feed the heartbeat.
+     **P2 failsafe timing: trip 514 ms after the last command, 5 of 5 trials**
+     (500 ms limit + one 5 ms pass + USB). Loop `max_gap` 11-16 ms.
+     Found: when a host opens the port, the Linux tty briefly echoes the Pico's own
+     output back, so the Pico logs `BAD READY`. Harmless (it doesn't feed the
+     heartbeat); the Pi driver must open the port raw and ignore startup lines.
+     Ctrl-D no longer soft-resets the board (main.py owns stdin); use `mpremote reset`.
    - Plan, one step at a time:
-     a. `mpremote` on Jr; deploy from the repo, not by editing on the board.
+     a. ~~`mpremote` on Jr~~ done.
      b. udev rule for a stable `/dev/forrest-pico` name (needs sudo once).
      c. `src/forrest/drivers/pico.py`: parser for OK/BAD/FAILSAFE/STAT, with
         tests that run without hardware.
@@ -83,14 +98,6 @@ finished items are deleted from here.
         commands, stop, measure the trip against 500 ms); P3 30-min telemetry soak.
 
 ## Open
-
-### [jr→mac] 2026-11-08 — Pico drive firmware: push the originals
-- The Pico's files say they come from `firmware/pico/drive/` (main.py, bench/main.py,
-  protocol.py) plus `tests/test_pico_protocol.py`, written 2026-11-05. None of that is
-  on origin (no branch has it), so it's probably only on the MacBook.
-- Jr committed what is **on the board** (protocol.py, bench/main.py) at the same paths.
-  Please commit and push the MacBook's drive tree and the test. If a file differs from
-  Jr's copy, keep the newer one and note which.
 
 ### [jr→mac] 2026-11-08 — Continuity edits (MacBook only)
 - **DECISIONS.md**, append:

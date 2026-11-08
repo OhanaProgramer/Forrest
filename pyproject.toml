@@ -13,7 +13,7 @@ dependencies = [
 
 [project.optional-dependencies]
 viz = ["matplotlib>=3.8"]
-dev = ["pytest>=8"]
+dev = ["pytest>=8", "mpremote>=1.24"]   # mpremote: deploy to the Pico
 
 [project.scripts]
 forrest = "forrest.tools.cli:main"
