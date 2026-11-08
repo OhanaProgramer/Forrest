@@ -20,6 +20,7 @@ from typing import Optional
 import time
 
 from forrest.dashboard import pico as pico_panel
+from forrest.dashboard.sidebar import sidebar
 from forrest.dashboard.status import GROUPS, LIMITS, Monitor
 from forrest.health.pico_monitor import default_state_path
 
@@ -61,6 +62,9 @@ def make_handler(vision):
                 # The Pico panel reads the monitor's state file; the dashboard never opens the port.
                 pico = pico_panel.panel(pico_panel.read_state(pico_state), time.time())
                 body = {"hardware": monitor.read(), "limits": LIMITS, "pico": pico,
+                        # sensors not fitted yet: env/gps/battery pass None until their drivers exist
+                        "sidebar": sidebar(pico=pico),
+                        "lidar": {"running": False, "error": "no LIDAR yet (bench test B1 not run)"},
                         "groups": [{"key": k, "title": t, "question": q} for k, t, q in GROUPS],
                         "vision": vision.status() if vision else {"running": False,
                                                                   "error": "camera off (start with --camera)"}}

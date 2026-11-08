@@ -31,6 +31,7 @@
     --track:#184f95; --spark:#5f5e58; --na:#383835;
   }
   * { box-sizing:border-box; }
+  [hidden] { display:none !important; }   /* hidden always wins over a display rule */
   body { margin:0; background:var(--page); color:var(--ink);
          font:15px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
   .wrap { max-width:1440px; margin:0 auto; padding:0 16px 24px; }
@@ -68,7 +69,6 @@
   .light .why { font-size:12px; color:var(--ink-2); max-width:22ch; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .light.hist { margin-left:auto; justify-content:center; }
   .light.hist .dot { display:none; }
-  .allgood { color:var(--muted); font-size:13px; padding:2px 0; }
   @media (max-width:520px) { .light { min-width:0; flex:1 1 calc(50% - 8px); } .light.hist { margin-left:0; } }
 
   /* section labels */
@@ -138,10 +138,59 @@
   .events .ev.FAILSAFE .k, .events .ev.BAD .k { color:var(--ink); }
   .events .empty { color:var(--muted); padding:4px 14px; }
 
-  /* camera (only when running with --camera) */
-  #camera { background:var(--surface); border-radius:10px; box-shadow:0 0 0 1px var(--ring);
-            padding:12px 14px; max-width:820px; }
-  #camera img { width:100%; aspect-ratio:4/3; background:#000; border-radius:6px; display:block; }
+  /* layout: header (lights) / sidebar (always-on numbers) / main views (radar + camera) */
+  .top { display:flex; flex-wrap:wrap; align-items:center; gap:10px 18px; padding:14px 0 12px; }
+  .top .lights { flex:1 1 auto; margin:0; }
+  .top .light.hist { margin-left:0; }
+  .top .meta { margin-left:auto; margin-top:0; }
+  .app { display:grid; grid-template-columns:230px minmax(0, 1fr); gap:14px; align-items:start; }
+
+  .side { background:var(--surface); border-radius:10px; box-shadow:0 0 0 1px var(--ring);
+          padding:10px 12px; display:flex; flex-direction:column; gap:12px; position:sticky; top:10px; }
+  .side h3 { margin:0 0 3px; font-size:11.5px; font-weight:600; text-transform:uppercase;
+             letter-spacing:.08em; color:var(--muted); }
+  .srow { display:grid; grid-template-columns:8px 1fr auto; gap:0 8px; align-items:baseline; padding:3px 0; }
+  .srow + .srow { border-top:1px solid var(--grid); }
+  .srow .sd { width:8px; height:8px; border-radius:50%; background:var(--na); align-self:center; }
+  .srow.ok .sd { background:var(--good); } .srow.warn .sd { background:var(--warn); } .srow.bad .sd { background:var(--crit); }
+  .srow .sl { color:var(--ink-2); font-size:13px; }
+  .srow .sv { font-size:14px; font-weight:600; font-variant-numeric:tabular-nums; text-align:right; }
+  .srow.na .sv { color:var(--muted); font-weight:400; }
+  .srow .sx { grid-column:2 / 4; font-size:11.5px; color:var(--muted); }
+
+  .views { position:relative; display:grid; grid-template-columns:1fr 1fr; gap:12px;
+           min-height:max(460px, calc(100vh - 120px)); align-items:stretch; }
+  .view { background:var(--surface); border-radius:10px; box-shadow:0 0 0 1px var(--ring);
+          padding:10px 12px; display:flex; flex-direction:column; min-width:0; }
+  .vh { display:flex; align-items:baseline; gap:10px; }
+  .vh h2 { margin:0; font-size:15px; font-weight:600; }
+  .vh span { color:var(--muted); font-size:12.5px; font-variant-numeric:tabular-nums; }
+  .vbody { position:relative; flex:1; display:grid; place-items:center; margin-top:8px; min-height:280px; }
+  #radar { width:100%; max-width:460px; aspect-ratio:1; display:block; }
+  #radar .ring { fill:none; stroke:var(--grid); }
+  #radar .axis { stroke:var(--axis); stroke-dasharray:2 3; }
+  #radar .bot { fill:var(--s1); }
+  #radar text { font-size:7px; }
+  #view { width:100%; aspect-ratio:4/3; background:#000; border-radius:6px; display:block; }
+  .vmsg { color:var(--muted); font-size:13px; text-align:center; max-width:34ch; line-height:1.5; }
+  #radar-msg { position:absolute; left:0; right:0; bottom:6px; margin:0 auto; }
+  .vmsg code { font-size:12px; color:var(--ink-2); }
+
+  /* health drawer: open groups, Pico events and history slide over the views */
+  .drawer { position:absolute; inset:0; overflow:auto; z-index:5; background:var(--page); border-radius:10px;
+            box-shadow:0 0 0 1px var(--ring), 0 10px 30px rgba(0,0,0,.35); padding:0 14px 14px; }
+  .dh { display:flex; justify-content:space-between; align-items:center; position:sticky; top:0; z-index:3;
+        background:var(--page); padding:10px 0 4px; }
+  .dh h2 { margin:0; font-size:15px; font-weight:600; }
+  .dh button { appearance:none; border:0; font:inherit; font-size:13px; color:var(--ink); cursor:pointer;
+               background:var(--surface); box-shadow:0 0 0 1px var(--ring); border-radius:8px; padding:6px 10px; }
+  @media (max-width:860px) {
+    .app { grid-template-columns:1fr; }
+    .side { position:static; flex-direction:row; flex-wrap:wrap; gap:4px 16px; }
+    .side section { flex:1 1 200px; }
+    .views { grid-template-columns:1fr; min-height:0; }
+    .drawer { position:fixed; inset:8px; }
+  }
 
   /* table view */
   details { margin-top:18px; background:var(--surface); border-radius:10px; box-shadow:0 0 0 1px var(--ring); }
@@ -156,56 +205,71 @@
 </head>
 <body>
 <div class="wrap">
-<header>
+<header class="top">
   <div class="id">
     <h1>Forrest Jr</h1>
     <div class="host" id="host">connecting…</div>
   </div>
-  <div class="summary">
-    <div class="meta" id="meta">waiting for first sample</div>
-  </div>
+  <nav class="lights" id="lights" aria-label="Status by group"></nav>
+  <div class="meta" id="meta">waiting for first sample</div>
 </header>
 
-<nav class="lights" id="lights" aria-label="Status by group"></nav>
+<div class="app">
+<aside class="side" id="side" aria-label="Always-on readings"></aside>
 
-<section id="now-wrap">
-  <h2 class="sec">Now <span>trend line = last 2 min</span></h2>
-  <section class="groups" id="strip" aria-live="polite"></section>
-</section>
-<div class="allgood" id="allgood" hidden>All groups nominal. Click a light to open it.</div>
+<main class="views">
+  <section class="view" id="radar-view">
+    <div class="vh"><h2>Radar</h2><span id="radar-sub">LIDAR, top-down · rings every 1 m</span></div>
+    <div class="vbody">
+      <svg id="radar" viewBox="-110 -110 220 220" role="img" aria-label="LIDAR radar view"></svg>
+      <div class="vmsg" id="radar-msg"></div>
+    </div>
+  </section>
+  <section class="view" id="camera-view">
+    <div class="vh"><h2>Camera</h2><span id="cam-fps"></span></div>
+    <div class="vbody">
+      <img id="view" alt="Live camera view with detection boxes" hidden>
+      <div class="vmsg" id="cam-msg"></div>
+    </div>
+  </section>
 
-<section id="pico-events-wrap" hidden>
-  <h2 class="sec">Pico events <span>link changes, failsafe trips, rejected lines · newest first</span></h2>
-  <div class="events" id="pico-events" aria-live="polite"></div>
-</section>
+  <div class="drawer" id="drawer" hidden>
+    <div class="dh"><h2>Health</h2><button type="button" id="drawer-close">Close ✕</button></div>
+    <section id="now-wrap">
+      <h2 class="sec">Now <span>trend line = last 2 min</span></h2>
+      <section class="groups" id="strip" aria-live="polite"></section>
+    </section>
 
-<section id="camera-wrap" hidden>
-  <h2 class="sec">Camera <span id="cam-fps"></span></h2>
-  <div id="camera"><img id="view" alt="Live camera view with detection boxes"></div>
-</section>
+    <section id="pico-events-wrap" hidden>
+      <h2 class="sec">Pico events <span>link changes, failsafe trips, rejected lines · newest first</span></h2>
+      <div class="events" id="pico-events" aria-live="polite"></div>
+    </section>
 
-<section id="history-wrap" hidden>
-<h2 class="sec">History <span id="hist-sub">last 30 min</span></h2>
-<section class="charts">
-  <div class="chart" id="c-temp">
-    <h3>Temperature</h3>
-    <div class="sub" data-sub></div>
-    <div class="legend" data-legend></div>
-    <div class="plot"><svg role="img" aria-label="CPU and AI HAT temperature, last 30 minutes"></svg><div class="tip"></div></div>
+    <section id="history-wrap" hidden>
+    <h2 class="sec">History <span id="hist-sub">last 30 min</span></h2>
+    <section class="charts">
+      <div class="chart" id="c-temp">
+        <h3>Temperature</h3>
+        <div class="sub" data-sub></div>
+        <div class="legend" data-legend></div>
+        <div class="plot"><svg role="img" aria-label="CPU and AI HAT temperature, last 30 minutes"></svg><div class="tip"></div></div>
+      </div>
+      <div class="chart" id="c-cpu">
+        <h3>CPU load</h3>
+        <div class="sub" data-sub></div>
+        <div class="plot"><svg role="img" aria-label="CPU load, last 30 minutes"></svg><div class="tip"></div></div>
+      </div>
+      <div class="chart" id="c-net">
+        <h3>Network throughput</h3>
+        <div class="sub" data-sub></div>
+        <div class="legend" data-legend></div>
+        <div class="plot"><svg role="img" aria-label="Network receive and send, last 30 minutes"></svg><div class="tip"></div></div>
+      </div>
+    </section>
+    </section>
   </div>
-  <div class="chart" id="c-cpu">
-    <h3>CPU load</h3>
-    <div class="sub" data-sub></div>
-    <div class="plot"><svg role="img" aria-label="CPU load, last 30 minutes"></svg><div class="tip"></div></div>
-  </div>
-  <div class="chart" id="c-net">
-    <h3>Network throughput</h3>
-    <div class="sub" data-sub></div>
-    <div class="legend" data-legend></div>
-    <div class="plot"><svg role="img" aria-label="Network receive and send, last 30 minutes"></svg><div class="tip"></div></div>
-  </div>
-</section>
-</section>
+</main>
+</div>
 
 <details>
   <summary>Readings table (every value, with units and source)</summary>
@@ -555,6 +619,15 @@ let fold = {};
 try { fold = JSON.parse(localStorage.getItem(FOLD_KEY) || "{}") || {}; } catch (e) { fold = {}; }
 function saveFold() { try { localStorage.setItem(FOLD_KEY, JSON.stringify(fold)); } catch (e) {} }
 let lastLevels = {}, lastTiles = [], lastGroups = [];
+// A light changes colour at once, but a group only opens by itself after it has been
+// yellow/red for SUSTAIN samples in a row (~6 s), so a brief CPU spike doesn't throw
+// the drawer over the radar and camera.
+const SUSTAIN = 3;
+const streak = {};
+function autoOpen(key, lvl) {
+  const alarm = key === "history" ? lvl === "bad" : RANK[lvl] > 0;
+  return alarm && (streak[key] || 0) >= SUSTAIN;
+}
 
 function worstOf(levels) {
   if (!levels.length) return "na";
@@ -565,22 +638,24 @@ function worstOf(levels) {
 function isOpen(key, lvl) {
   const m = fold[key];
   if (m) {
-    if (!m.open && RANK[lvl] > RANK[m.at]) { delete fold[key]; saveFold(); }   // got worse: show it
+    if (!m.open && (RANK[lvl] > RANK[m.at] || (RANK[lvl] === 0 && RANK[m.at] > 0))) {
+      delete fold[key]; saveFold();     // got worse, or the alarm you closed is over: back to automatic
+    }
     else return m.open;
   }
-  return key === "history" ? lvl === "bad" : RANK[lvl] > 0;
+  return autoOpen(key, lvl);
 }
 function toggle(key) {
   const lvl = lastLevels[key] || "ok";
   const now = isOpen(key, lvl);
-  const auto = key === "history" ? lvl === "bad" : RANK[lvl] > 0;
+  const auto = autoOpen(key, lvl);
   if (!now === auto) delete fold[key];          // back to what it would do by itself
   else fold[key] = { open: !now, at: lvl };
   saveFold();
   renderLights(lastTiles, lastGroups);
 }
 
-function renderLights(tiles, groups) {
+function renderLights(tiles, groups, fromTick = false) {
   lastTiles = tiles; lastGroups = groups;
   const bar = $("lights");
   const items = groups.filter(g => tiles.some(t => t.group === g.key))
@@ -604,6 +679,10 @@ function renderLights(tiles, groups) {
     const b = bar.querySelector(`.light[data-key="${it.key}"]`);
     const lvl = it.tiles ? worstOf(it.tiles.map(t => t.level)) : all;
     lastLevels[it.key] = lvl;
+    if (fromTick) {
+      const alarm = it.key === "history" ? lvl === "bad" : RANK[lvl] > 0;
+      streak[it.key] = alarm ? (streak[it.key] || 0) + 1 : 0;
+    }
     const open = isOpen(it.key, lvl);
     b.className = "light" + (it.key === "history" ? " hist" : " " + lvl);
     b.setAttribute("aria-expanded", open);
@@ -628,8 +707,11 @@ function renderLights(tiles, groups) {
     }
   }
   $("now-wrap").hidden = !anyOpen;
-  $("allgood").hidden = anyOpen;
+  $("drawer").hidden = !(anyOpen || !$("history-wrap").hidden);
 }
+$("drawer-close").addEventListener("click", () => {
+  for (const key of Object.keys(lastLevels)) if (isOpen(key, lastLevels[key])) toggle(key);
+});
 
 function renderHeader(tiles, raw, time) {
   const h = raw.host || {};
@@ -661,12 +743,70 @@ function renderPicoEvents(p) {
 }
 
 function renderCamera(v) {
-  const wrap = $("camera-wrap"), img = $("view");
+  const img = $("view"), msg = $("cam-msg");
   if (v && v.running) {
-    if (wrap.hidden) { wrap.hidden = false; img.src = "/stream"; }
+    if (img.hidden) { img.hidden = false; img.src = "/stream"; }
+    msg.hidden = true;
     $("cam-fps").textContent = `${v.fps} fps · ${v.model}`;
-  } else if (!wrap.hidden) { wrap.hidden = true; img.removeAttribute("src"); }
+  } else {
+    if (!img.hidden) { img.hidden = true; img.removeAttribute("src"); }
+    msg.hidden = false;
+    msg.innerHTML = "Camera off. The boot service leaves the camera free;<br>run <code>forrest dash --camera</code> to see it here.";
+    $("cam-fps").textContent = "";
+  }
 }
+
+// ---------- sidebar (always-on numbers) ----------
+function renderSidebar(sections) {
+  const side = $("side");
+  side.innerHTML = "";
+  for (const sec of sections || []) {
+    const box = document.createElement("section");
+    const h = document.createElement("h3"); h.textContent = sec.title; box.appendChild(h);
+    // a section with no sensor at all collapses to one line; it expands once readings arrive
+    const why = new Set(sec.rows.map(r => r.detail));
+    if (sec.rows.every(r => r.level === "na") && why.size === 1) {
+      const row = document.createElement("div"); row.className = "srow na";
+      const d = document.createElement("span"); d.className = "sd";
+      const l = document.createElement("span"); l.className = "sl"; l.textContent = sec.rows.map(r => r.label).join(" · ");
+      const x = document.createElement("span"); x.className = "sx"; x.textContent = [...why][0];
+      row.append(d, l, document.createElement("span"), x);
+      box.appendChild(row); side.appendChild(box);
+      continue;
+    }
+    for (const r of sec.rows) {
+      const row = document.createElement("div"); row.className = "srow " + r.level;
+      row.title = `${r.label}: ${r.value}${r.detail ? " (" + r.detail + ")" : ""}`;
+      for (const [cls, txt] of [["sd", ""], ["sl", r.label], ["sv", r.value]]) {
+        const c = document.createElement("span"); c.className = cls; c.textContent = txt; row.appendChild(c);
+      }
+      if (r.detail) { const x = document.createElement("span"); x.className = "sx"; x.textContent = r.detail; row.appendChild(x); }
+      box.appendChild(row);
+    }
+    side.appendChild(box);
+  }
+}
+
+// ---------- radar (LIDAR, top-down; robot at the centre, front = up) ----------
+const RADAR_M = 4;   // metres to the edge
+function drawRadarFrame() {
+  const svg = $("radar"); svg.innerHTML = "";
+  const k = 100 / RADAR_M;
+  for (let m = 1; m <= RADAR_M; m++) {
+    el("circle", { class: "ring", cx: 0, cy: 0, r: m * k }, svg);
+    const t = el("text", { x: 2, y: -m * k + 7 }, svg); t.textContent = `${m} m`;
+  }
+  el("line", { class: "axis", x1: -100, y1: 0, x2: 100, y2: 0 }, svg);
+  el("line", { class: "axis", x1: 0, y1: -100, x2: 0, y2: 100 }, svg);
+  el("polygon", { class: "bot", points: "0,-6 4.5,5 0,2.5 -4.5,5" }, svg);   // robot, pointing forward
+}
+function renderRadar(l) {
+  const msg = $("radar-msg");
+  if (l && l.running) { msg.hidden = true; return; }      // live points: next step (after B1)
+  msg.hidden = false;
+  msg.textContent = (l && l.error) || "no LIDAR";
+}
+drawRadarFrame();
 
 // ---------- polling ----------
 async function loadHistory() {
@@ -685,10 +825,12 @@ async function tick() {
     const raw = s.hardware.raw;
     const tiles = s.hardware.tiles.concat(s.pico ? s.pico.tiles : []);
     renderTiles(tiles, raw, s.groups);
-    renderLights(tiles, s.groups);
+    renderLights(tiles, s.groups, true);
     renderHeader(tiles, raw, s.hardware.time);
     renderTable(raw, s.pico);
     renderPicoEvents(s.pico);
+    renderSidebar(s.sidebar);
+    renderRadar(s.lidar);
     renderCamera(s.vision);
     if (!$("history-wrap").hidden) drawCharts();
     const L = limits;

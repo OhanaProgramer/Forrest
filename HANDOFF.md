@@ -123,6 +123,17 @@ finished items are deleted from here.
         remembered in that browser (localStorage). A manual close is dropped if the group
         gets worse. History is folded and opens by itself on any red. Checked: all-green
         view and a simulated Pico link-down. Clicking was not tested headless: try it.
+        **Page layout, 2026-11-08:** header = lights; left sidebar = always-on numbers
+        (Environment, Position, Robot: `dashboard/sidebar.py`, 3 tests); main = two live
+        views, **Radar** (LIDAR top-down, frame only until B1) and **Camera** (stream with
+        `--camera`, otherwise a note). The health groups, Pico events and History open as a
+        drawer over the views (full screen on a phone). Auto-open now waits for 3 samples
+        (~6 s) of yellow/red, so a CPU spike only flashes the light. A manual close is
+        cleared once the group is green again. Checked: desktop + phone screenshots; a
+        real CPU spike opened the drawer before the 6 s wait was added. Not clicked: the
+        drawer's Close button.
+        Next for the views: B1 (LIDAR on the bench) -> `forrest-lidar` service (same pattern
+        as forrest-pico) -> live radar; then the camera inside the boot service.
         Original plan for e: Pico panel on `forrest dash`: link up/down (data older than a few seconds =
         down), failsafe state + trip log, loop `max_gap_ms`, command age. Read-only.
      f. Bench tests: P1 link (unplug → "link down"); P2 failsafe timing (send
@@ -130,7 +141,19 @@ finished items are deleted from here.
 
 ## Open
 
+### [jr→mac] 2026-11-08 — Sensor shopping list (Jacque has none yet)
+- Air temp / humidity / pressure: BME280- or BME688-class breakout (I2C, on the Pi), ~$10-20.
+- GPS: u-blox M8/M9 USB module (on the Pi), ~$20-40.
+- Battery voltage: resistor divider into a Pico ADC pin (reported in the Pico's STAT).
+- The LIDAR (RPLIDAR C1) exists; it is just not plugged in. B1 not run yet.
+
 ### [jr→mac] 2026-11-08 — Continuity edits (MacBook only)
+- **DECISIONS.md**, append: `## 2026-11-08 — Forrest dashboard layout: lights, sidebar, two views`
+  - Status lights per group across the top (red/yellow/green; internal page, so colour alone
+    is acceptable). Always-on sidebar: environment, position, robot (battery, Pico, drive).
+    Main area: two live views, LIDAR radar and camera. Health detail and history open as a
+    drawer only when needed or clicked. A future map may load OpenStreetMap tiles over the
+    viewer's phone connection (Jacque: OK); robot data stays on the tailnet.
 - **DECISIONS.md**, append:
   `## 2026-11-08 — Forrest Jr: Pico 2 bench + monitoring page next`
   - Jacque: the Pico 2 is developed locally on forrest-jr for now. The focus is
