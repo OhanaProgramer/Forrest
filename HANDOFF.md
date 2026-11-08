@@ -132,6 +132,13 @@ finished items are deleted from here.
         cleared once the group is green again. Checked: desktop + phone screenshots; a
         real CPU spike opened the drawer before the 6 s wait was added. Not clicked: the
         drawer's Close button.
+        **Reboot test 2026-11-08 (kernel now 6.18.60):** forrest-dash and forrest-pico both came
+        up by themselves; camera (ov5647) detected; `forrest dash --camera` worked for Jacque.
+        **Offline handling, 2026-11-08:** after 6 s without the Pi, the camera's last frame is
+        dropped for an OFFLINE card (last-frame time), the radar says OFFLINE, lights/sidebar grey
+        out, header says "OFFLINE since ...". Reconnects by itself; a dropped stream alone retries
+        after 2 s. FPS is now a badge on the image. Checked with a stand-in server that stops
+        answering (screenshot). Not checked: a real Wi-Fi drop with the camera running.
         Next for the views: B1 (LIDAR on the bench) -> `forrest-lidar` service (same pattern
         as forrest-pico) -> live radar; then the camera inside the boot service.
         Original plan for e: Pico panel on `forrest dash`: link up/down (data older than a few seconds =

@@ -171,7 +171,19 @@
   #radar .axis { stroke:var(--axis); stroke-dasharray:2 3; }
   #radar .bot { fill:var(--s1); }
   #radar text { font-size:7px; }
+  .camframe { position:relative; width:100%; }
   #view { width:100%; aspect-ratio:4/3; background:#000; border-radius:6px; display:block; }
+  .camfps { position:absolute; top:8px; left:8px; background:rgba(0,0,0,.6); color:#fff; border-radius:6px;
+            padding:3px 8px; font-size:13px; font-weight:600; font-variant-numeric:tabular-nums; }
+  .offcard { width:100%; aspect-ratio:4/3; border-radius:6px; display:grid; place-content:center; gap:6px;
+             text-align:center; background:repeating-linear-gradient(135deg, #141414 0 14px, #1b1b1b 14px 28px);
+             box-shadow:inset 0 0 0 1px var(--ring); }
+  .offcard b { font-size:28px; letter-spacing:.18em; color:var(--crit); }
+  .offcard span { color:var(--muted); font-size:13px; font-variant-numeric:tabular-nums; }
+  /* lost the Pi: nothing on screen may look live */
+  body.offline .light .dot, body.offline .srow .sd { background:var(--na) !important; }
+  body.offline .light { background:var(--surface) !important; }
+  body.offline .lights, body.offline .side { opacity:.55; }
   .vmsg { color:var(--muted); font-size:13px; text-align:center; max-width:34ch; line-height:1.5; }
   #radar-msg { position:absolute; left:0; right:0; bottom:6px; margin:0 auto; }
   .vmsg code { font-size:12px; color:var(--ink-2); }
@@ -228,7 +240,10 @@
   <section class="view" id="camera-view">
     <div class="vh"><h2>Camera</h2><span id="cam-fps"></span></div>
     <div class="vbody">
-      <img id="view" alt="Live camera view with detection boxes" hidden>
+      <div class="camframe" id="camframe" hidden>
+        <img id="view" alt="Live camera view with detection boxes">
+        <span class="camfps" id="cam-badge"></span>
+      </div>
       <div class="vmsg" id="cam-msg"></div>
     </div>
   </section>
@@ -742,19 +757,47 @@ function renderPicoEvents(p) {
   }
 }
 
+let camLastLive = null;     // time the camera was last seen running (for the OFFLINE card)
+function startStream() {
+  // a fresh URL each time, so the browser opens a new connection instead of reusing a dead one
+  $("view").src = "/stream?t=" + Date.now();
+}
+function stopStream() { $("view").removeAttribute("src"); }
 function renderCamera(v) {
-  const img = $("view"), msg = $("cam-msg");
+  const frame = $("camframe"), msg = $("cam-msg");
   if (v && v.running) {
-    if (img.hidden) { img.hidden = false; img.src = "/stream"; }
+    if (frame.hidden) { frame.hidden = false; startStream(); }
     msg.hidden = true;
-    $("cam-fps").textContent = `${v.fps} fps · ${v.model}`;
+    camLastLive = Date.now();
+    $("cam-badge").textContent = `${Math.round(v.fps)} fps`;
+    $("cam-fps").textContent = `${v.model} · threshold ${v.threshold}`;
   } else {
-    if (!img.hidden) { img.hidden = true; img.removeAttribute("src"); }
+    if (!frame.hidden) { frame.hidden = true; stopStream(); }
     msg.hidden = false;
-    msg.innerHTML = "Camera off. The boot service leaves the camera free;<br>run <code>forrest dash --camera</code> to see it here.";
+    msg.innerHTML = v && v.error && v.error.indexOf("--camera") < 0
+      ? `Camera error: ${v.error.replace(/[<>&]/g, "")}`
+      : "Camera off. The boot service leaves the camera free;<br>run <code>forrest dash --camera</code> to see it here.";
     $("cam-fps").textContent = "";
   }
 }
+function showOffline() {
+  // lost the Pi: drop the frozen frame and say so, with when we last had a picture
+  const frame = $("camframe"), msg = $("cam-msg");
+  if (!frame.hidden) { frame.hidden = true; stopStream(); }
+  const last = camLastLive ? "last frame " + clock(camLastLive / 1000) : "no frame since this page opened";
+  msg.hidden = false;
+  msg.innerHTML = `<div class="offcard"><b>OFFLINE</b><span>${last}</span><span>reconnects by itself</span></div>`;
+  msg.style.width = "100%"; msg.style.maxWidth = "none";
+  $("cam-fps").textContent = "";
+  $("radar-msg").hidden = false;
+  $("radar-msg").textContent = "OFFLINE";
+}
+// the stream connection itself dropped while the page is still connected: try again in 2 s
+$("view").addEventListener("error", () => {
+  if (!$("camframe").hidden && !document.body.classList.contains("offline")) setTimeout(() => {
+    if (!$("camframe").hidden) startStream();
+  }, 2000);
+});
 
 // ---------- sidebar (always-on numbers) ----------
 function renderSidebar(sections) {
@@ -821,6 +864,10 @@ async function tick() {
   try {
     const [sr] = await Promise.all([fetch("/api/status", { cache: "no-store" }), loadHistory()]);
     const s = await sr.json();
+    if (document.body.classList.contains("offline")) {   // back online
+      document.body.classList.remove("offline");
+      $("cam-msg").style.width = ""; $("cam-msg").style.maxWidth = "";
+    }
     limits = s.limits || {};
     const raw = s.hardware.raw;
     const tiles = s.hardware.tiles.concat(s.pico ? s.pico.tiles : []);
@@ -840,8 +887,11 @@ async function tick() {
     lastOk = Date.now();
   } catch (e) {
     if (Date.now() - lastOk > 6000) {
+      document.body.classList.add("offline");
+      showOffline();
       $("meta").className = "meta stale";
-      $("meta").textContent = "server not reachable — showing last values";
+      $("meta").textContent = lastOk ? `OFFLINE since ${clock(lastOk / 1000)} · values greyed are old`
+                                     : "OFFLINE · can't reach the Pi";
     }
   }
 }
