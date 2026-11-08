@@ -56,6 +56,14 @@
   h2.sec span { text-transform:none; letter-spacing:0; font-weight:400; }
 
   /* tiles */
+  /* Now block: functional groups side by side, each sized by its tile count */
+  .groups { display:flex; flex-wrap:wrap; gap:14px 18px; }
+  .grp { flex:var(--n) 1 max(180px, calc(var(--n) * 140px + (var(--n) - 1) * 10px)); min-width:0;
+         max-width:calc(var(--n) * 260px + (var(--n) - 1) * 10px); }
+  .grp .strip { grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); }
+  .grp h3 { margin:0 0 6px; font-size:13px; font-weight:600; color:var(--ink-2);
+            display:flex; gap:8px; align-items:baseline; white-space:nowrap; overflow:hidden; }
+  .grp h3 span { font-weight:400; color:var(--muted); font-size:12px; overflow:hidden; text-overflow:ellipsis; }
   .strip { display:grid; gap:10px; grid-template-columns:repeat(auto-fit, minmax(128px, 1fr)); }
   .tile { background:var(--surface); border-radius:10px; box-shadow:0 0 0 1px var(--ring);
           padding:11px 13px 10px; min-width:0; display:flex; flex-direction:column; }
@@ -127,7 +135,7 @@
 </header>
 
 <h2 class="sec">Now <span>trend line = last 2 min</span></h2>
-<section class="strip" id="strip" aria-live="polite"></section>
+<section class="groups" id="strip" aria-live="polite"></section>
 
 <section id="camera-wrap" hidden>
   <h2 class="sec">Camera <span id="cam-fps"></span></h2>
@@ -220,20 +228,38 @@ function splitValue(v) {
   return m ? [m[1], m[2]] : [v, ""];
 }
 
-function renderTiles(tiles, raw) {
+let layoutSig = "";
+function renderTiles(tiles, raw, groups) {
   const strip = $("strip");
-  if (strip.children.length !== tiles.length) {
+  // rebuild the group layout only when the set of tiles changes (e.g. Ethernet plugged in)
+  const sig = tiles.map(t => t.group + ":" + t.key).join(",");
+  if (sig !== layoutSig) {
+    layoutSig = sig;
     strip.innerHTML = "";
-    for (const _ of tiles) {
-      const d = document.createElement("div");
-      d.className = "tile";
-      d.innerHTML = '<div class="top"><span class="label"></span><span class="badge"><i></i></span></div>' +
-                    '<div class="value"></div><div class="detail"></div><div class="viz"></div>';
-      strip.appendChild(d);
+    for (const g of groups) {
+      const members = tiles.filter(t => t.group === g.key);
+      if (!members.length) continue;
+      const box = document.createElement("div");
+      box.className = "grp";
+      box.style.setProperty("--n", members.length);
+      const h = document.createElement("h3");
+      const q = document.createElement("span"); q.textContent = g.question;
+      h.append(g.title, q);
+      const grid = document.createElement("div"); grid.className = "strip";
+      for (const t of members) {
+        const d = document.createElement("div");
+        d.className = "tile"; d.dataset.key = t.key;
+        d.innerHTML = '<div class="top"><span class="label"></span><span class="badge"><i></i></span></div>' +
+                      '<div class="value"></div><div class="detail"></div><div class="viz"></div>';
+        grid.appendChild(d);
+      }
+      box.append(h, grid);
+      strip.appendChild(box);
     }
   }
-  tiles.forEach((t, i) => {
-    const d = strip.children[i];
+  tiles.forEach(t => {
+    const d = strip.querySelector(`.tile[data-key="${t.key}"]`);
+    if (!d) return;
     const [glyph, word] = STATE[t.level] || STATE.na;
     d.querySelector(".label").textContent = t.title;
     const badge = d.querySelector(".badge");
@@ -511,7 +537,7 @@ async function tick() {
     const s = await sr.json();
     limits = s.limits || {};
     const raw = s.hardware.raw;
-    renderTiles(s.hardware.tiles, raw);
+    renderTiles(s.hardware.tiles, raw, s.groups);
     renderHeader(s.hardware.tiles, raw, s.hardware.time);
     renderTable(raw);
     renderCamera(s.vision);

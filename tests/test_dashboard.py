@@ -83,8 +83,9 @@ def _raw(**over):
 
 def test_tiles_all_good():
     tiles = {t["key"]: t for t in st.tiles(_raw())}
-    assert list(tiles) == ["cpu", "cpu_temp", "hailo", "power", "fan", "mem", "disk",
-                           "wlan0", "tailscale", "uptime"]
+    assert list(tiles) == ["cpu_temp", "hailo", "fan", "power", "cpu", "mem", "disk",
+                           "uptime", "wlan0", "tailscale"]
+    assert [tiles[k]["group"] for k in tiles] == ["thermal"] * 3 + ["power"] + ["system"] * 4 + ["network"] * 2
     assert all(t["level"] == "ok" for t in tiles.values())
     assert tiles["cpu"]["detail"] == "2.40 of 2.40 GHz"
     assert tiles["cpu_temp"]["detail"] == "22.0 °C below throttle"

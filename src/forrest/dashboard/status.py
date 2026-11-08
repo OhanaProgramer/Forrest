@@ -337,10 +337,26 @@ class Monitor:
 
 # -- presentation (pure, tested) ---------------------------------------------
 
+# Functional groups for the Now block, in display order. Each answers one question.
+GROUPS = [
+    ("thermal", "Thermal", "is it running hot?"),
+    ("power", "Power", "is the supply clean?"),
+    ("system", "System", "is it keeping up?"),
+    ("network", "Network", "can I reach it?"),
+]
+TILE_GROUP = {"cpu_temp": "thermal", "hailo": "thermal", "fan": "thermal",
+              "power": "power",
+              "cpu": "system", "mem": "system", "disk": "system", "uptime": "system",
+              "tailscale": "network"}   # any other key is a network interface
+
+
 def tiles(raw: dict) -> list[dict]:
-    """Raw readings -> the strip: title, main value, detail line, level."""
+    """Raw readings -> the strip: title, main value, detail line, level, group.
+
+    Returned in group order (GROUPS); within a group, in the order built below."""
     def tile(key, title, value, detail, lvl):
-        return {"key": key, "title": title, "value": value, "detail": detail, "level": lvl}
+        return {"key": key, "title": title, "value": value, "detail": detail, "level": lvl,
+                "group": TILE_GROUP.get(key, "network")}
 
     out = []
     c = raw["cpu"]
@@ -403,4 +419,5 @@ def tiles(raw: dict) -> list[dict]:
 
     u = raw["uptime_s"]
     out.append(tile("uptime", "Uptime", human_duration(u) if u is not None else "–", "since boot", "ok"))
-    return out
+    order = [g[0] for g in GROUPS]
+    return sorted(out, key=lambda t: order.index(t["group"]))   # stable: keeps order within a group

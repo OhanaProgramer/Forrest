@@ -17,7 +17,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Optional
 
-from forrest.dashboard.status import LIMITS, Monitor
+from forrest.dashboard.status import GROUPS, LIMITS, Monitor
 
 PAGE = Path(__file__).with_name("index.html")
 BOUNDARY = "forrestframe"
@@ -54,6 +54,7 @@ def make_handler(vision):
                 self._send(200, PAGE.read_bytes(), "text/html; charset=utf-8")
             elif path == "/api/status":
                 body = {"hardware": monitor.read(), "limits": LIMITS,
+                        "groups": [{"key": k, "title": t, "question": q} for k, t, q in GROUPS],
                         "vision": vision.status() if vision else {"running": False,
                                                                   "error": "camera off (start with --camera)"}}
                 self._send(200, json.dumps(body).encode(), "application/json")
