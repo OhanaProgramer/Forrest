@@ -105,6 +105,17 @@
   svg .endlabel { fill:var(--ink); font-weight:600; font-size:11.5px; }
   svg .limitlabel { font-size:10.5px; }
 
+  /* Pico events (from the forrest-pico monitor) */
+  .events { background:var(--surface); border-radius:10px; box-shadow:0 0 0 1px var(--ring);
+            padding:6px 0; max-width:820px; font-size:13px; }
+  .events .ev { display:grid; grid-template-columns:max-content 6.5em 1fr; gap:10px; padding:4px 14px; }
+  .events .ev + .ev { border-top:1px solid var(--grid); }
+  .events .t { color:var(--muted); font-variant-numeric:tabular-nums; }
+  .events .k { font-weight:600; color:var(--ink-2); }
+  .events .x { overflow-wrap:anywhere; }
+  .events .ev.FAILSAFE .k, .events .ev.BAD .k { color:var(--ink); }
+  .events .empty { color:var(--muted); padding:4px 14px; }
+
   /* camera (only when running with --camera) */
   #camera { background:var(--surface); border-radius:10px; box-shadow:0 0 0 1px var(--ring);
             padding:12px 14px; max-width:820px; }
@@ -136,6 +147,11 @@
 
 <h2 class="sec">Now <span>trend line = last 2 min</span></h2>
 <section class="groups" id="strip" aria-live="polite"></section>
+
+<section id="pico-events-wrap" hidden>
+  <h2 class="sec">Pico events <span>link changes, failsafe trips, rejected lines · newest first</span></h2>
+  <div class="events" id="pico-events" aria-live="polite"></div>
+</section>
 
 <section id="camera-wrap" hidden>
   <h2 class="sec">Camera <span id="cam-fps"></span></h2>
@@ -472,7 +488,7 @@ function drawCharts() {
 }
 
 // ---------- table + header ----------
-function renderTable(raw) {
+function renderTable(raw, pico) {
   const fx = (v, u) => v != null ? `${v} ${u}` : "–";
   const rows = [
     ["CPU load", fx(raw.cpu.pct, "%"), "/proc/stat"],
@@ -487,6 +503,8 @@ function renderTable(raw) {
     ...Object.entries(raw.network).map(([n, v]) => [n, `${v.ip}${v.signal_dbm != null ? ", " + v.signal_dbm + " dBm" : ""}, ↓ ${rate(v.rx_bps)} ↑ ${rate(v.tx_bps)}`, "/proc/net"]),
     ["Tailscale", raw.tailscale ? `${raw.tailscale.state}, ${raw.tailscale.ip}` : "–", "tailscale status"],
     ["Uptime", raw.uptime_s != null ? `${Math.round(raw.uptime_s)} s` : "–", "/proc/uptime"],
+    ...(pico ? pico.tiles.map(t => [t.title, `${t.value}${t.detail ? " · " + t.detail.replace(/\n/g, " · ") : ""}`,
+                                    "forrest-pico monitor (STAT reply to \"?\")"]) : []),
   ];
   const tb = $("table"); tb.innerHTML = "";
   for (const [a, b, c] of rows) {
@@ -514,6 +532,28 @@ function renderHeader(tiles, raw, time) {
   $("meta").textContent = `sampled every ${hist?.every_s ?? 2} s · updated ${clock(time)}`;
 }
 
+const EV_WORD = { LINK: "link", FAILSAFE: "failsafe", READY: "Pico boot", BAD: "rejected", UNKNOWN: "other" };
+function renderPicoEvents(p) {
+  const wrap = $("pico-events-wrap"), box = $("pico-events");
+  if (!p) { wrap.hidden = true; return; }
+  wrap.hidden = false;
+  const evs = (p.events || []).slice(-10).reverse();
+  box.innerHTML = "";
+  if (!evs.length) {
+    const d = document.createElement("div"); d.className = "empty";
+    d.textContent = p.monitor === "running" ? "No events since the monitor started." : "Monitor not running.";
+    box.appendChild(d);
+    return;
+  }
+  for (const e of evs) {
+    const row = document.createElement("div"); row.className = "ev " + e.kind;
+    for (const [cls, txt] of [["t", clock(e.t)], ["k", EV_WORD[e.kind] || e.kind], ["x", e.text]]) {
+      const c = document.createElement("span"); c.className = cls; c.textContent = txt; row.appendChild(c);
+    }
+    box.appendChild(row);
+  }
+}
+
 function renderCamera(v) {
   const wrap = $("camera-wrap"), img = $("view");
   if (v && v.running) {
@@ -537,14 +577,17 @@ async function tick() {
     const s = await sr.json();
     limits = s.limits || {};
     const raw = s.hardware.raw;
-    renderTiles(s.hardware.tiles, raw, s.groups);
-    renderHeader(s.hardware.tiles, raw, s.hardware.time);
-    renderTable(raw);
+    const tiles = s.hardware.tiles.concat(s.pico ? s.pico.tiles : []);
+    renderTiles(tiles, raw, s.groups);
+    renderHeader(tiles, raw, s.hardware.time);
+    renderTable(raw, s.pico);
+    renderPicoEvents(s.pico);
     renderCamera(s.vision);
     drawCharts();
     const L = limits;
     $("footer").textContent = `Read-only · tailnet only · limits — CPU temp: caution ${L.cpu_temp?.[0]} °C, throttle ${L.cpu_temp?.[1]} °C · ` +
-      `AI HAT: caution ${L.hailo_temp?.[0]} °C · Wi-Fi: caution below ${L.wifi_dbm?.[0]} dBm · input: caution below ${L.input_v?.[0]} V`;
+      `AI HAT: caution ${L.hailo_temp?.[0]} °C · Wi-Fi: caution below ${L.wifi_dbm?.[0]} dBm · input: caution below ${L.input_v?.[0]} V · ` +
+      `Pico loop: caution ${L.pico_gap_ms?.[0]} ms, limit ${L.pico_gap_ms?.[1]} ms`;
     lastOk = Date.now();
   } catch (e) {
     if (Date.now() - lastOk > 6000) {

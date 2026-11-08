@@ -108,7 +108,16 @@ finished items are deleted from here.
         polls `?` (STAT) and logs every line to `data/`. It writes the latest
         state to a file for the dashboard. It does **not** send drive commands,
         so the Pico stays in failsafe.
-     e. Pico panel on `forrest dash`: link up/down (data older than a few seconds =
+     **Installed + running 2026-11-08** (Jacque ran install-pico.sh; unplug test passed:
+        link lost at 14:46:08, back by itself at 14:46:20).
+     e. **Done 2026-11-08:** Pico group on `forrest dash` (`src/forrest/dashboard/pico.py`,
+        7 tests): tiles Pico link / Drive output / Pico loop / Failsafe trips, plus a
+        "Pico events" list (last 10). Reads the monitor's state file; never opens the
+        port. Not plugged in = caution; plugged in but silent = at limit; monitor stopped
+        (state older than 5 s) = no data. Failsafe is "ok" while nothing drives; make it
+        a warning once a controller exists. New limit `pico_gap_ms` caution 50 / limit 150.
+        Checked live: desktop + phone screenshots, and monitor stop -> "no data" -> start -> up.
+        Original plan for e: Pico panel on `forrest dash`: link up/down (data older than a few seconds =
         down), failsafe state + trip log, loop `max_gap_ms`, command age. Read-only.
      f. Bench tests: P1 link (unplug → "link down"); P2 failsafe timing (send
         commands, stop, measure the trip against 500 ms); P3 30-min telemetry soak.

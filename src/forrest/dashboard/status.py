@@ -33,6 +33,9 @@ LIMITS = {
     "disk_pct":   (80, 90, "high"),
     "wifi_dbm":   (-70, -80, "low"),   # -50 excellent, -70 fair, -80 poor
     "input_v":    (5.0, 4.8, "low"),   # Pi 5 wants 5.1 V
+    # Pico loop: the failsafe is checked once per pass (normally ~6-16 ms). A long
+    # pause delays a trip by that much on top of the 500 ms timeout.
+    "pico_gap_ms": (50, 150, "high"),
 }
 LEVELS = ["ok", "warn", "bad"]
 
@@ -343,6 +346,7 @@ GROUPS = [
     ("power", "Power", "is the supply clean?"),
     ("system", "System", "is it keeping up?"),
     ("network", "Network", "can I reach it?"),
+    ("pico", "Pico", "is the safety bridge alive?"),
 ]
 TILE_GROUP = {"cpu_temp": "thermal", "hailo": "thermal", "fan": "thermal",
               "power": "power",

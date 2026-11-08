@@ -2,7 +2,7 @@
 
     /              the dashboard page
     /stream        live annotated view (MJPEG)
-    /api/status    hardware status + vision status (JSON)
+    /api/status    hardware status + vision status + Pico panel (JSON)
     /api/history   the last 30 min of samples, as columns (JSON)
 
 Read-only by design: nothing here moves hardware. Bind it to the Tailscale
@@ -17,7 +17,11 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Optional
 
+import time
+
+from forrest.dashboard import pico as pico_panel
 from forrest.dashboard.status import GROUPS, LIMITS, Monitor
+from forrest.health.pico_monitor import default_state_path
 
 PAGE = Path(__file__).with_name("index.html")
 BOUNDARY = "forrestframe"
@@ -35,6 +39,7 @@ def tailscale_ip() -> Optional[str]:
 def make_handler(vision):
     """`vision` is a VisionLoop, or None to run without a camera (the default)."""
     monitor = Monitor().start()
+    pico_state = default_state_path()
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, fmt, *args):  # keep the terminal quiet
@@ -53,7 +58,9 @@ def make_handler(vision):
             if path == "/":
                 self._send(200, PAGE.read_bytes(), "text/html; charset=utf-8")
             elif path == "/api/status":
-                body = {"hardware": monitor.read(), "limits": LIMITS,
+                # The Pico panel reads the monitor's state file; the dashboard never opens the port.
+                pico = pico_panel.panel(pico_panel.read_state(pico_state), time.time())
+                body = {"hardware": monitor.read(), "limits": LIMITS, "pico": pico,
                         "groups": [{"key": k, "title": t, "question": q} for k, t, q in GROUPS],
                         "vision": vision.status() if vision else {"running": False,
                                                                   "error": "camera off (start with --camera)"}}
