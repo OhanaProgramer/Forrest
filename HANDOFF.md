@@ -117,6 +117,12 @@ finished items are deleted from here.
         (state older than 5 s) = no data. Failsafe is "ok" while nothing drives; make it
         a warning once a controller exists. New limit `pico_gap_ms` caution 50 / limit 150.
         Checked live: desktop + phone screenshots, and monitor stop -> "no data" -> start -> up.
+        **Status lights, 2026-11-08:** a bar of red/yellow/green lights (one per group,
+        worst tile wins) replaces the header summary. Green groups are folded; yellow/red
+        open by themselves and close again when green. A click overrides that and is
+        remembered in that browser (localStorage). A manual close is dropped if the group
+        gets worse. History is folded and opens by itself on any red. Checked: all-green
+        view and a simulated Pico link-down. Clicking was not tested headless: try it.
         Original plan for e: Pico panel on `forrest dash`: link up/down (data older than a few seconds =
         down), failsafe state + trip log, loop `max_gap_ms`, command age. Read-only.
      f. Bench tests: P1 link (unplug → "link down"); P2 failsafe timing (send

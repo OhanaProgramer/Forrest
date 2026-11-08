@@ -50,6 +50,27 @@
   .meta { color:var(--muted); font-size:12.5px; margin-top:3px; font-variant-numeric:tabular-nums; }
   .meta.stale { color:var(--crit); }
 
+  /* status lights: one per group, worst level of its tiles; click to open/close the group */
+  .lights { display:flex; flex-wrap:wrap; gap:8px; margin:2px 0 4px; align-items:stretch; }
+  .light { appearance:none; border:0; font:inherit; color:var(--ink); cursor:pointer; text-align:left;
+           background:var(--surface); box-shadow:0 0 0 1px var(--ring); border-radius:10px;
+           padding:8px 12px; min-width:118px; display:flex; flex-direction:column; gap:2px; }
+  .light:hover { box-shadow:0 0 0 1px var(--axis); }
+  .light[aria-expanded="true"] { box-shadow:0 0 0 2px var(--s1); }
+  .light .nm { display:flex; align-items:center; gap:8px; font-weight:600; font-size:14px; white-space:nowrap; }
+  .light .nm .car { margin-left:auto; padding-left:8px; color:var(--muted); font-size:11px; }
+  .light .dot { width:12px; height:12px; border-radius:50%; background:var(--na); flex:none; }
+  .light.ok .dot { background:var(--good); }
+  .light.warn .dot { background:var(--warn); }
+  .light.bad .dot { background:var(--crit); }
+  .light.warn { background:color-mix(in srgb, var(--warn) 12%, var(--surface)); }
+  .light.bad { background:color-mix(in srgb, var(--crit) 16%, var(--surface)); }
+  .light .why { font-size:12px; color:var(--ink-2); max-width:22ch; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .light.hist { margin-left:auto; justify-content:center; }
+  .light.hist .dot { display:none; }
+  .allgood { color:var(--muted); font-size:13px; padding:2px 0; }
+  @media (max-width:520px) { .light { min-width:0; flex:1 1 calc(50% - 8px); } .light.hist { margin-left:0; } }
+
   /* section labels */
   h2.sec { font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.08em;
            color:var(--muted); margin:18px 0 8px; display:flex; gap:10px; align-items:baseline; }
@@ -108,6 +129,7 @@
   /* Pico events (from the forrest-pico monitor) */
   .events { background:var(--surface); border-radius:10px; box-shadow:0 0 0 1px var(--ring);
             padding:6px 0; max-width:820px; font-size:13px; }
+  #pico-events-wrap h2.sec { margin-top:12px; }
   .events .ev { display:grid; grid-template-columns:max-content 6.5em 1fr; gap:10px; padding:4px 14px; }
   .events .ev + .ev { border-top:1px solid var(--grid); }
   .events .t { color:var(--muted); font-variant-numeric:tabular-nums; }
@@ -140,13 +162,17 @@
     <div class="host" id="host">connecting…</div>
   </div>
   <div class="summary">
-    <div class="state" id="state"><span class="glyph">·</span><span id="state-text">waiting for first sample</span></div>
-    <div class="meta" id="meta"></div>
+    <div class="meta" id="meta">waiting for first sample</div>
   </div>
 </header>
 
-<h2 class="sec">Now <span>trend line = last 2 min</span></h2>
-<section class="groups" id="strip" aria-live="polite"></section>
+<nav class="lights" id="lights" aria-label="Status by group"></nav>
+
+<section id="now-wrap">
+  <h2 class="sec">Now <span>trend line = last 2 min</span></h2>
+  <section class="groups" id="strip" aria-live="polite"></section>
+</section>
+<div class="allgood" id="allgood" hidden>All groups nominal. Click a light to open it.</div>
 
 <section id="pico-events-wrap" hidden>
   <h2 class="sec">Pico events <span>link changes, failsafe trips, rejected lines · newest first</span></h2>
@@ -158,6 +184,7 @@
   <div id="camera"><img id="view" alt="Live camera view with detection boxes"></div>
 </section>
 
+<section id="history-wrap" hidden>
 <h2 class="sec">History <span id="hist-sub">last 30 min</span></h2>
 <section class="charts">
   <div class="chart" id="c-temp">
@@ -177,6 +204,7 @@
     <div class="legend" data-legend></div>
     <div class="plot"><svg role="img" aria-label="Network receive and send, last 30 minutes"></svg><div class="tip"></div></div>
   </div>
+</section>
 </section>
 
 <details>
@@ -256,7 +284,7 @@ function renderTiles(tiles, raw, groups) {
       const members = tiles.filter(t => t.group === g.key);
       if (!members.length) continue;
       const box = document.createElement("div");
-      box.className = "grp";
+      box.className = "grp"; box.dataset.group = g.key;
       box.style.setProperty("--n", members.length);
       const h = document.createElement("h3");
       const q = document.createElement("span"); q.textContent = g.question;
@@ -516,18 +544,96 @@ function renderTable(raw, pico) {
   }
 }
 
+// ---------- status lights + folding ----------
+// Each group's light = the worst level among its tiles. Yellow/red groups open by
+// themselves and close again when back to green. A click overrides that and is
+// remembered in this browser; a manual "closed" is dropped if the group gets worse
+// than it was when you closed it. History opens by itself when anything is red.
+const RANK = { na: 0, ok: 0, warn: 1, bad: 2 };
+const FOLD_KEY = "forrest-dash-fold";
+let fold = {};
+try { fold = JSON.parse(localStorage.getItem(FOLD_KEY) || "{}") || {}; } catch (e) { fold = {}; }
+function saveFold() { try { localStorage.setItem(FOLD_KEY, JSON.stringify(fold)); } catch (e) {} }
+let lastLevels = {}, lastTiles = [], lastGroups = [];
+
+function worstOf(levels) {
+  if (!levels.length) return "na";
+  if (levels.includes("bad")) return "bad";
+  if (levels.includes("warn")) return "warn";
+  return levels.every(l => l === "na") ? "na" : "ok";
+}
+function isOpen(key, lvl) {
+  const m = fold[key];
+  if (m) {
+    if (!m.open && RANK[lvl] > RANK[m.at]) { delete fold[key]; saveFold(); }   // got worse: show it
+    else return m.open;
+  }
+  return key === "history" ? lvl === "bad" : RANK[lvl] > 0;
+}
+function toggle(key) {
+  const lvl = lastLevels[key] || "ok";
+  const now = isOpen(key, lvl);
+  const auto = key === "history" ? lvl === "bad" : RANK[lvl] > 0;
+  if (!now === auto) delete fold[key];          // back to what it would do by itself
+  else fold[key] = { open: !now, at: lvl };
+  saveFold();
+  renderLights(lastTiles, lastGroups);
+}
+
+function renderLights(tiles, groups) {
+  lastTiles = tiles; lastGroups = groups;
+  const bar = $("lights");
+  const items = groups.filter(g => tiles.some(t => t.group === g.key))
+                      .map(g => ({ key: g.key, title: g.title, tiles: tiles.filter(t => t.group === g.key) }));
+  const all = worstOf(tiles.map(t => t.level));
+  items.push({ key: "history", title: "History", tiles: null });
+  const sig = items.map(i => i.key).join(",");
+  if (bar.dataset.sig !== sig) {
+    bar.dataset.sig = sig; bar.innerHTML = "";
+    for (const it of items) {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "light"; b.dataset.key = it.key;
+      if (it.key === "history") b.classList.add("hist");
+      b.innerHTML = '<span class="nm"><span class="dot"></span><span class="tt"></span><span class="car"></span></span><span class="why"></span>';
+      b.addEventListener("click", () => toggle(it.key));
+      bar.appendChild(b);
+    }
+  }
+  let anyOpen = false;
+  for (const it of items) {
+    const b = bar.querySelector(`.light[data-key="${it.key}"]`);
+    const lvl = it.tiles ? worstOf(it.tiles.map(t => t.level)) : all;
+    lastLevels[it.key] = lvl;
+    const open = isOpen(it.key, lvl);
+    b.className = "light" + (it.key === "history" ? " hist" : " " + lvl);
+    b.setAttribute("aria-expanded", open);
+    b.querySelector(".tt").textContent = it.title;
+    b.querySelector(".car").textContent = open ? "▾" : "▸";
+    const why = b.querySelector(".why");
+    if (it.tiles) {
+      const off = it.tiles.filter(t => t.level === "warn" || t.level === "bad");
+      why.textContent = off.length ? off.map(t => `${t.title} ${t.value}`).join(" · ")
+                      : lvl === "na" ? "no data" : "";
+      why.hidden = !why.textContent;
+      b.title = `${it.title}: ${STATE[lvl][1]}` + (why.textContent ? ` (${why.textContent})` : "");
+      const box = $("strip").querySelector(`.grp[data-group="${it.key}"]`);
+      if (box) box.hidden = !open;
+      if (it.key === "pico") $("pico-events-wrap").dataset.fold = open ? "open" : "closed";
+      anyOpen = anyOpen || open;
+    } else {
+      why.hidden = true;
+      const wrap = $("history-wrap"), was = !wrap.hidden;
+      wrap.hidden = !open;
+      if (open && !was && hist) requestAnimationFrame(drawCharts);   // charts need a visible width
+    }
+  }
+  $("now-wrap").hidden = !anyOpen;
+  $("allgood").hidden = anyOpen;
+}
+
 function renderHeader(tiles, raw, time) {
   const h = raw.host || {};
   $("host").textContent = [h.model, "Hailo-8 AI HAT+", h.kernel && "kernel " + h.kernel].filter(Boolean).join(" · ");
-  const off = tiles.filter(t => t.level === "warn" || t.level === "bad");
-  const worst = off.some(t => t.level === "bad") ? "bad" : off.length ? "warn" : "ok";
-  const st = $("state");
-  st.className = "state " + worst;
-  st.querySelector(".glyph").textContent = STATE[worst][0];
-  const checked = tiles.filter(t => t.level !== "na").length;
-  $("state-text").textContent = worst === "ok"
-    ? `Nominal · ${checked} of ${checked} within limits`
-    : `${worst === "bad" ? "At limit" : "Caution"} · ${off.map(t => t.title).join(", ")}`;
   $("meta").className = "meta";
   $("meta").textContent = `sampled every ${hist?.every_s ?? 2} s · updated ${clock(time)}`;
 }
@@ -535,7 +641,7 @@ function renderHeader(tiles, raw, time) {
 const EV_WORD = { LINK: "link", FAILSAFE: "failsafe", READY: "Pico boot", BAD: "rejected", UNKNOWN: "other" };
 function renderPicoEvents(p) {
   const wrap = $("pico-events-wrap"), box = $("pico-events");
-  if (!p) { wrap.hidden = true; return; }
+  if (!p || wrap.dataset.fold !== "open") { wrap.hidden = true; return; }
   wrap.hidden = false;
   const evs = (p.events || []).slice(-10).reverse();
   box.innerHTML = "";
@@ -579,11 +685,12 @@ async function tick() {
     const raw = s.hardware.raw;
     const tiles = s.hardware.tiles.concat(s.pico ? s.pico.tiles : []);
     renderTiles(tiles, raw, s.groups);
+    renderLights(tiles, s.groups);
     renderHeader(tiles, raw, s.hardware.time);
     renderTable(raw, s.pico);
     renderPicoEvents(s.pico);
     renderCamera(s.vision);
-    drawCharts();
+    if (!$("history-wrap").hidden) drawCharts();
     const L = limits;
     $("footer").textContent = `Read-only · tailnet only · limits — CPU temp: caution ${L.cpu_temp?.[0]} °C, throttle ${L.cpu_temp?.[1]} °C · ` +
       `AI HAT: caution ${L.hailo_temp?.[0]} °C · Wi-Fi: caution below ${L.wifi_dbm?.[0]} dBm · input: caution below ${L.input_v?.[0]} V · ` +
@@ -596,7 +703,7 @@ async function tick() {
     }
   }
 }
-window.addEventListener("resize", () => { if (hist) drawCharts(); });
+window.addEventListener("resize", () => { if (hist && !$("history-wrap").hidden) drawCharts(); });
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", tick);
 tick(); setInterval(tick, 2000);
 </script>
