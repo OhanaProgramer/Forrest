@@ -7,6 +7,7 @@
     forrest power                               # one-shot Pi power/heat check
     forrest view [--threshold 0.5]              # desktop window: live view + boxes
     forrest dash [--host H] [--port 8090] [--camera]      # dashboard web server
+    forrest pico check [--port P] [--polls 5]   # is the Pico answering? (read-only)
 """
 
 from __future__ import annotations
@@ -244,6 +245,57 @@ def cmd_dash(args) -> int:
 
 
 # ---------------------------------------------------------------------------
+# pico check  (is the Pico alive and answering? read-only: never sends drive commands)
+# ---------------------------------------------------------------------------
+
+def _ago(ms: int) -> str:
+    s = ms / 1000
+    if s < 60:
+        return f"{s:.1f} s ago"
+    m = int(s // 60)
+    return f"{m // 60} h {m % 60} min ago" if m >= 60 else f"{m} min ago"
+
+
+def cmd_pico_check(args) -> int:
+    from forrest.drivers.pico import Pico, PicoError
+
+    try:
+        pico = Pico(args.port)
+    except (PicoError, OSError) as e:
+        print(f"Pico: {e}")
+        if "lock" in str(e):
+            print("Another program has the Pico open (only one may). "
+                  "Stop it first, e.g. `systemctl --user stop forrest-pico` or close mpremote.")
+        return 1
+    answered, rtts = 0, []
+    with pico:
+        print(f"Pico on {pico.port}. Polling status {args.polls}x (read-only, no drive commands).")
+        for i in range(args.polls):
+            t0 = time.monotonic()
+            stat = pico.status()
+            for ev in list(pico.events):
+                print(f"  event: {ev.text}")
+            pico.events.clear()
+            if stat is None:
+                print(f"  {i + 1}: no reply in 0.5 s")
+            else:
+                answered += 1
+                rtts.append(1000 * (time.monotonic() - t0))
+                f = stat.fields
+                state = "FAILSAFE (throttle cut)" if f["age_ms"] > 500 else "commanded"
+                print(f"  {i + 1}: {state:24s} throttle {f['throttle']:5d}  steer {f['steer']:5d}  "
+                      f"esc {f['esc_ns'] / 1e6:.3f} ms  last cmd {_ago(f['age_ms'])}  "
+                      f"loop gap {f['max_gap_ms']} ms  trips {f.get('trips', '?')}")
+            if i + 1 < args.polls:
+                time.sleep(args.every)
+    rtts.sort()
+    rtt = f", round trip {rtts[len(rtts) // 2]:.1f} ms median" if rtts else ""
+    print(f"Link {'UP' if answered == args.polls else 'DOWN' if not answered else 'FLAKY'}: "
+          f"{answered}/{args.polls} answered{rtt}.")
+    return 0 if answered == args.polls else 1
+
+
+# ---------------------------------------------------------------------------
 
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(prog="forrest", description=__doc__,
@@ -290,6 +342,14 @@ def main(argv=None) -> int:
     d.add_argument("--camera", action="store_true",
                    help="also run camera + Hailo detection (holds the camera)")
     d.set_defaults(func=cmd_dash)
+
+    pico = sub.add_parser("pico", help="Pico 2 drive controller tools")
+    psub = pico.add_subparsers(dest="pico_cmd", required=True)
+    pc = psub.add_parser("check", help="poll the Pico's status (read-only)")
+    pc.add_argument("--port", help="serial port (default: find the Pico by USB id)")
+    pc.add_argument("--polls", type=int, default=5)
+    pc.add_argument("--every", type=float, default=1.0, help="seconds between polls")
+    pc.set_defaults(func=cmd_pico_check)
 
     args = p.parse_args(argv)
     try:

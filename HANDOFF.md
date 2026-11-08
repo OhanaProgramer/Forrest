@@ -86,8 +86,14 @@ finished items are deleted from here.
    - Plan, one step at a time:
      a. ~~`mpremote` on Jr~~ done.
      b. udev rule for a stable `/dev/forrest-pico` name (needs sudo once).
-     c. `src/forrest/drivers/pico.py`: parser for OK/BAD/FAILSAFE/STAT, with
-        tests that run without hardware.
+     c. ~~`src/forrest/drivers/pico.py`~~ **done 2026-11-08**: parses READY/OK/BAD/
+        FAILSAFE/STAT (never raises; unreadable = UNKNOWN), finds the Pico by USB id
+        (2e8a:0005), opens it **exclusive** (a second program is refused; verified),
+        drops the startup echo. `status()` polls `?` (no heartbeat);
+        `send_command()` is the heartbeat, for a controller only. 18 tests
+        (`tests/test_pico_driver.py`). `forrest pico check` = read-only poll; on the
+        board: link UP, ~6-7 ms round trip. The udev rule (b) is no longer needed for
+        finding the port; skip it unless a second Pico appears.
      d. `forrest-pico` user service: the only program that opens the port. It
         polls `?` (STAT) and logs every line to `data/`. It writes the latest
         state to a file for the dashboard. It does **not** send drive commands,
