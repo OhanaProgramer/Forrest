@@ -55,8 +55,55 @@ finished items are deleted from here.
      retries every 5 s until tailscale0 is up (no silent 127.0.0.1 fallback).
      Verified running + HTTP 200; not yet proven across a real reboot.
    - Next, one at a time: camera panel, detection log.
+   - **Done 2026-11-08:** Now tiles grouped as Thermal / Power / System / Network
+     (commit 11f0b18). Not yet checked in a browser; restart `forrest-dash` to load it.
+3. **Pico 2 bench + monitoring (new focus from 2026-11-08, forrest-jr owns it).**
+   Jacque: develop the Pico 2 locally on Jr for now. The aim is to test the hardware
+   and build the monitoring process and page, so a running robot can be watched
+   over the web.
+   - Board: Pico 2 (RP2350), MicroPython 1.29.0, USB serial `1c4e1cea890aaffb`,
+     `/dev/ttyACM0`. On the board: the bench firmware (`main.py`) + `protocol.py`.
+     Boot output: `READY`, then `FAILSAFE 1499901`, which means throttle cut to
+     neutral (1.5 ms) 500 ms after boot with no commands. That is the correct behaviour.
+   - **Done 2026-11-08:** copied both files off the board into the repo, at the
+     paths their headers name: `firmware/pico/drive/protocol.py`,
+     `firmware/pico/drive/bench/main.py`. Nothing is wired to GP0/GP1.
+   - Plan, one step at a time:
+     a. `mpremote` on Jr; deploy from the repo, not by editing on the board.
+     b. udev rule for a stable `/dev/forrest-pico` name (needs sudo once).
+     c. `src/forrest/drivers/pico.py`: parser for OK/BAD/FAILSAFE/STAT, with
+        tests that run without hardware.
+     d. `forrest-pico` user service: the only program that opens the port. It
+        polls `?` (STAT) and logs every line to `data/`. It writes the latest
+        state to a file for the dashboard. It does **not** send drive commands,
+        so the Pico stays in failsafe.
+     e. Pico panel on `forrest dash`: link up/down (data older than a few seconds =
+        down), failsafe state + trip log, loop `max_gap_ms`, command age. Read-only.
+     f. Bench tests: P1 link (unplug → "link down"); P2 failsafe timing (send
+        commands, stop, measure the trip against 500 ms); P3 30-min telemetry soak.
 
 ## Open
+
+### [jr→mac] 2026-11-08 — Pico drive firmware: push the originals
+- The Pico's files say they come from `firmware/pico/drive/` (main.py, bench/main.py,
+  protocol.py) plus `tests/test_pico_protocol.py`, written 2026-11-05. None of that is
+  on origin (no branch has it), so it's probably only on the MacBook.
+- Jr committed what is **on the board** (protocol.py, bench/main.py) at the same paths.
+  Please commit and push the MacBook's drive tree and the test. If a file differs from
+  Jr's copy, keep the newer one and note which.
+
+### [jr→mac] 2026-11-08 — Continuity edits (MacBook only)
+- **DECISIONS.md**, append:
+  `## 2026-11-08 — Forrest Jr: Pico 2 bench + monitoring page next`
+  - Jacque: the Pico 2 is developed locally on forrest-jr for now. The focus is
+    testing the hardware and setting up the monitoring process and pages, so a
+    running robot can be watched over the web (`forrest dash`, tailnet only, read-only).
+  - The monitor only reads the Pico (status polls). It never sends drive commands.
+- **02_Projects/Forrest/SYSTEMS.md**: add the Pico bench steps P1–P3 (link, failsafe
+  timing, telemetry soak) as the current step.
+- **USER.md / local_IT**: forrest-jr now boots from a Samsung 860 EVO 250G SSD over
+  USB (seen 2026-11-08), not an SD card. Desktop session switched to X11 (rpd-x) for
+  xscreensaver.
 
 ### [jr→mac] 2026-11-04 — Continuity edits (MacBook only)
 - **DECISIONS.md**, append:
