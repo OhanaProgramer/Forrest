@@ -148,6 +148,35 @@ finished items are deleted from here.
 
 ## Open
 
+### [jr→mac] 2026-11-09 — Camera architecture for car-detection (explored; park until that phase; nothing to buy)
+Propose into DECISIONS.md / SYSTEMS.md:
+- **Two independent cameras, not a stereo pair.** A stereo pair (~2 ft baseline for depth) was
+  considered and dropped — a rigid, vibration-stable baseline + calibration on a moving cart is too
+  fragile. The one thing stereo would add is ranging a *far* car (the 12 m LIDAR can't reach it);
+  revisit only if single-camera ranging proves insufficient.
+- **Roles:** Cam 1 = **rear telephoto** = overtaking-car detection (primary threat; Jacque runs facing
+  traffic, cars overtake from behind). Cam 2 = **front wide** = cross-traffic / forward hazards, and a
+  follower backup only if the LIDAR can't fully follow. Following stays the LIDAR's job.
+- **Lens drives range, not height** (range ≈ warning time; a tighter lens ~doubles range; height only
+  helps sightline/occlusion). Tele market: Pi HQ (IMX477) + an 8–50 mm C-mount zoom to learn the
+  FoV↔range tradeoff, then a fixed telephoto.
+- **Compute:** one Pi + Hailo handles two cameras if the *inference* is duty-cycled (one hot, the other
+  on threat; cameras kept warm to avoid startup latency). Both running full-tilt at once is the trigger
+  to reconsider a 2nd processor.
+- **Sr option (parked):** a dedicated car-detection processor — a 2nd Pi+Hailo or a Jetson. Decide the
+  chip and the camera *together*: automotive-grade sensing (GMSL = single coax up to ~15 m + rugged;
+  global shutter = clean capture of fast cars) lives in the Jetson ecosystem. Let Jr measure the need first.
+
+### [jr→mac] 2026-11-09 — Jr camera test plan (uses the ov5647 + Hailo on hand; no buy; after/alongside B1)
+- **Forward-solo pipeline test:** prove capture → Hailo → detections as JSON → dashboard with the one
+  forward ov5647. Transfers wholesale to the rear detector (same pipeline, different lens/aim).
+- **Roadside oncoming-traffic test (Jacque's idea):** camera at the roadside facing oncoming traffic,
+  detect real cars. An approaching car growing in the frame is the *same* signal whether it's oncoming at
+  the roadside or an overtaker seen by the rear cam — so this validates the rear-detector's core job with
+  no moving robot. Record raw + detections; measure **first-detection range** (→ warning time at road
+  speed), false pos/neg, and day/dusk/dark. Also the test that **empirically picks the lens**: if the wide
+  ov5647 detects cars too late, that is the data that justifies the telephoto and its focal length.
+
 ### [jr→mac] 2026-11-08 — Sensor shopping list (Jacque has none yet)
 - Air temp / humidity / pressure: BME280- or BME688-class breakout (I2C, on the Pi), ~$10-20.
 - GPS: u-blox M8/M9 USB module (on the Pi), ~$20-40.
