@@ -24,7 +24,7 @@ finished items are deleted from here.
   For detections, stop the service and run `.venv/bin/forrest dash --camera` by hand.
 - Open: green cast on the ov5647 (white measures about R 98 / G 168 / B 166);
   detection log; camera panel on the page.
-- Mac to-do: the Continuity edits below. The hoverboard "why" still needs Jacque.
+- Mac to-do: the Continuity edits below (the hoverboard "why" is now filled in below — ready to move to DECISIONS.md).
 
 ## Now (forrest-jr, from 2026-11-04)
 1. **HAT + camera ops test** on the Pi (Hailo-8 + ov5647): live detection runs,
@@ -182,7 +182,17 @@ finished items are deleted from here.
     bench first, hoverboard base".
   - The drive base will be the 1/10 RC truck, the recorded fallback. That is future work.
   - Current focus: the HAT/camera ops test, then a mini status website run from
-    the Pi. Why the hoverboard was dropped: _Jacque to fill in_.
+    the Pi.
+  - **Why the hoverboard was dropped:** the open-firmware hack needs two broken-out
+    control lines per board — SWD to flash, UART to drive — but the HY-A02C exposed
+    only one clean 4-pin header; reaching the second would have meant soldering to the
+    MCU's ~0.5 mm legs, past Jacque's clean-build bar ("clean shot, not another
+    gamble"). Both candidate boards were returned: the Gyroor G13 (chip YY3061, in no
+    open firmware project — not hackable) and the HY-A02C (too fiddly). Jr's drive is
+    now an off-the-shelf 1/10 hobby-grade RC car — standard ESC + steering servo driven
+    by the Pico over servo-PWM — which needs no flashing and no chip-level soldering.
+    The hub-motor + off-the-shelf serial controller (VESC/ODrive) build is parked as
+    the future/Sr option.
 - **02_Projects/Forrest/SYSTEMS.md**: mark the hoverboard milestones (M0–M7) as
   dropped, set the drive base to the 1/10 RC truck (future), and add the camera
   ops test as the current step.
