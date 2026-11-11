@@ -42,11 +42,49 @@ def test_format_command():
         pd.format_command(True, 0)
 
 
-def test_find_port():
-    ports = [SimpleNamespace(device="/dev/ttyUSB0", vid=0x10C4, pid=0xEA60),   # LIDAR adapter
-             SimpleNamespace(device="/dev/ttyACM0", vid=0x2E8A, pid=0x0005)]
-    assert pd.find_port(ports) == "/dev/ttyACM0"
-    assert pd.find_port(ports[:1]) is None
+DRIVE = pd.BOARDS["drive"]
+
+
+def _ports():
+    return [SimpleNamespace(device="/dev/ttyUSB0", vid=0x10C4, pid=0xEA60, serial_number="0001"),  # LIDAR adapter
+            SimpleNamespace(device="/dev/ttyACM0", vid=0x2E8A, pid=0x0005, serial_number="e6614c311b2f2a37"),
+            SimpleNamespace(device="/dev/ttyACM1", vid=0x2E8A, pid=0x0005, serial_number=DRIVE.upper())]
+
+
+def test_find_port_by_serial_not_by_usb_id():
+    ports = _ports()
+    # The unknown Pico on ACM0 comes first and has the same USB id: it must not be picked.
+    assert pd.find_port(ports, DRIVE) == "/dev/ttyACM1"          # serial match ignores case
+    assert pd.find_port(ports[:2], DRIVE) is None                # no fallback to "any Pico"
+    assert pd.find_port(ports, "0001") is None                   # LIDAR isn't a MicroPython board
+
+
+def test_micropython_ports_and_roles():
+    assert [p.device for p in pd.micropython_ports(_ports())] == ["/dev/ttyACM0", "/dev/ttyACM1"]
+    assert pd.role_of(DRIVE) == "drive"
+    assert pd.role_of(DRIVE.upper()) == "drive"
+    assert pd.role_of("e6614c311b2f2a37") is None
+    assert pd.role_of(None) is None
+
+
+def test_two_boards_each_find_their_own():
+    ports = _ports() + [SimpleNamespace(device="/dev/ttyACM2", vid=0x2E8A, pid=0x0005,
+                                        serial_number=pd.BOARDS["sensors"])]
+    assert pd.board_port(ports, "drive") == "/dev/ttyACM1"
+    assert pd.board_port(ports, "sensors") == "/dev/ttyACM2"
+    assert pd.role_of(pd.BOARDS["sensors"]) == "sensors"
+    with pytest.raises(pd.PicoError, match="sensors Pico"):
+        pd.board_port(_ports(), "sensors")                     # drive alone doesn't satisfy "sensors"
+
+
+def test_board_port():
+    assert pd.board_port(_ports(), "drive") == "/dev/ttyACM1"
+    with pytest.raises(pd.PicoError, match="ttyACM0 .*not in BOARDS"):
+        pd.board_port(_ports()[:2], "drive")                     # error says what *is* there
+    with pytest.raises(pd.PicoError, match="none"):
+        pd.board_port([], "drive")
+    with pytest.raises(pd.PicoError, match="unknown board"):
+        pd.board_port(_ports(), "toaster")
 
 
 # -- the device, with a fake port ----------------------------------------------

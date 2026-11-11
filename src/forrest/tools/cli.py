@@ -7,7 +7,8 @@
     forrest power                               # one-shot Pi power/heat check
     forrest view [--threshold 0.5]              # desktop window: live view + boxes
     forrest dash [--host H] [--port 8090] [--camera]      # dashboard web server
-    forrest pico check [--port P] [--polls 5]   # is the Pico answering? (read-only)
+    forrest pico list                           # MicroPython boards on USB + which is which
+    forrest pico check [--board drive] [--port P] [--polls 5]   # is the Pico answering? (read-only)
     forrest pico monitor [--every 1]            # forrest-pico service: state file + daily log
 """
 
@@ -257,11 +258,29 @@ def _ago(ms: int) -> str:
     return f"{m // 60} h {m % 60} min ago" if m >= 60 else f"{m} min ago"
 
 
+def cmd_pico_list(args) -> int:
+    from serial.tools import list_ports
+    from forrest.drivers.pico import BOARDS, micropython_ports, role_of
+
+    found = micropython_ports(list_ports.comports())
+    if not found:
+        print("No MicroPython boards on USB.")
+    for p in found:
+        role = role_of(p.serial_number)
+        print(f"{p.device:14s} serial {p.serial_number}  "
+              f"{role if role else 'not in BOARDS (add it in src/forrest/drivers/pico.py)'}")
+    seen = {(p.serial_number or "").lower() for p in found}
+    for role, serial in BOARDS.items():
+        if serial.lower() not in seen:
+            print(f"{'(missing)':14s} serial {serial}  {role}")
+    return 0
+
+
 def cmd_pico_check(args) -> int:
     from forrest.drivers.pico import Pico, PicoError
 
     try:
-        pico = Pico(args.port)
+        pico = Pico(args.port, board=args.board)
     except (PicoError, OSError) as e:
         print(f"Pico: {e}")
         if "lock" in str(e):
@@ -368,8 +387,11 @@ def main(argv=None) -> int:
 
     pico = sub.add_parser("pico", help="Pico 2 drive controller tools")
     psub = pico.add_subparsers(dest="pico_cmd", required=True)
+    pl = psub.add_parser("list", help="MicroPython boards on USB and which board each one is")
+    pl.set_defaults(func=cmd_pico_list)
     pc = psub.add_parser("check", help="poll the Pico's status (read-only)")
-    pc.add_argument("--port", help="serial port (default: find the Pico by USB id)")
+    pc.add_argument("--board", default="drive", help="which board, by name in BOARDS (default: drive)")
+    pc.add_argument("--port", help="serial port; skips the serial-number check (default: find --board)")
     pc.add_argument("--polls", type=int, default=5)
     pc.add_argument("--every", type=float, default=1.0, help="seconds between polls")
     pc.set_defaults(func=cmd_pico_check)
