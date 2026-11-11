@@ -145,6 +145,26 @@ finished items are deleted from here.
         down), failsafe state + trip log, loop `max_gap_ms`, command age. Read-only.
      f. Bench tests: P1 link (unplug → "link down"); P2 failsafe timing (send
         commands, stop, measure the trip against 500 ms); P3 30-min telemetry soak.
+4. **Second Pico: the Pico W sensor board (from 2026-11-10, forrest-jr owns it).**
+   Jacque: two separate boards on the Pi's USB. Drive Pico 2 = safety only; Pico W =
+   sensors (BME688 at 0x77, INA219 at 0x40, STEMMA QT; cable not here yet).
+   - **Done 2026-11-10:** Pico W reflashed from Arduino to MicroPython 1.29.0
+     (`RPI_PICO_W`, RP2040). Serial `e6616408430b7439` under MicroPython (Arduino showed
+     `086461E639740B43`: re-check after any reflash). Filesystem empty, no firmware yet.
+   - **Done 2026-11-10, boards by serial number** (commit 6127fa1): every MicroPython
+     board reports USB id 2e8a:0005, so the driver now picks by serial (`BOARDS` in
+     `drivers/pico.py`; no fallback to "any Pico"). `forrest pico list`,
+     `forrest pico check --board`, `deploy.sh` targets `id:<drive serial>`.
+     Proven with both plugged in: Pico W took ttyACM0, drive took ttyACM1; the monitor
+     opened ACM1 only; `deploy.sh` landed on the drive (files "Up to date", drive rebooted),
+     the Pico W stayed empty.
+   - **Done 2026-11-10, dashboard** (commit 13d3962): group "Picos" adds a Sensor Pico
+     tile (USB presence only, port never opened) and an "Unknown Pico" caution for a
+     MicroPython board not in `BOARDS`. Checked via `/api/status`; not looked at in a browser.
+   - Next: `firmware/pico/sensors/` skeleton (`READY sensors`, readings-on-request,
+     "no sensor" until wired, host tests, its own deploy by serial) → sensor monitor →
+     tiles. Then BME688 + INA219 when the cable arrives. Read every few seconds;
+     BME688 trigger-then-collect so a read never blocks. INA219 range: ask Jacque what it measures.
 
 ## Open
 
@@ -182,6 +202,18 @@ Propose into DECISIONS.md / SYSTEMS.md:
 - GPS: u-blox M8/M9 USB module (on the Pi), ~$20-40.
 - Battery voltage: resistor divider into a Pico ADC pin (reported in the Pico's STAT).
 - The LIDAR (RPLIDAR C1) exists; it is just not plugged in. B1 not run yet.
+
+### [jr→mac] 2026-11-10 — Continuity edits (MacBook only)
+- **DECISIONS.md**, append: `## 2026-11-10 — Forrest Jr: two Picos, drive and sensors`
+  - Jacque: sensors go on a separate board (Pico W) on the Pi's USB, not on the drive
+    Pico 2 (the AI HAT covers the Pi's GPIO; the drive Pico stays safety-only, so a
+    sensor bug or loose I2C wire can't reach the failsafe). Sensor data is low priority:
+    read every few seconds.
+  - The Pi picks each board by USB serial number, never by USB id (all MicroPython
+    boards share 2e8a:0005).
+  - Power: two Picos + sensors add ~0.1 A on the Pi's 1.6 A USB budget (5 A supply);
+    the SSD and, later, the LIDAR are the big loads. On the vehicle the drive Pico must
+    not depend on the Pi's USB for power.
 
 ### [jr→mac] 2026-11-08 — Continuity edits (MacBook only)
 - **DECISIONS.md**, append: `## 2026-11-08 — Forrest dashboard layout: lights, sidebar, two views`
