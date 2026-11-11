@@ -62,14 +62,17 @@ def sidebar(env: Optional[dict] = None, gps: Optional[dict] = None,
     link = tiles.get("pico_link")
     drive = tiles.get("pico_drive")
     if link is None or link["level"] == "na":
-        rows.append(_none("Pico", "monitor not running"))
+        rows.append(_none("Drive Pico", "monitor not running"))
     else:
-        rows.append(_row("Pico", link["value"], "", link["level"]))
+        rows.append(_row("Drive Pico", link["value"], "", link["level"]))
     if drive is not None:
         safe = drive["value"] == "Failsafe"
         rows.append(_row("Drive", "failsafe" if safe else "commanded",
                          "throttle cut, nothing driving" if safe else "a controller is driving", "ok"))
     else:
-        rows.append(_none("Drive", "unknown without the Pico"))
+        rows.append(_none("Drive", "unknown without the drive Pico"))
+    sensors = tiles.get("pico_sensors")
+    if sensors is not None:
+        rows.append(_row("Sensor Pico", sensors["value"], "", sensors["level"]))
     out.append({"key": "robot", "title": "Robot", "rows": rows})
     return out

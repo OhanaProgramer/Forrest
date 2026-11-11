@@ -256,7 +256,7 @@
     </section>
 
     <section id="pico-events-wrap" hidden>
-      <h2 class="sec">Pico events <span>link changes, failsafe trips, rejected lines · newest first</span></h2>
+      <h2 class="sec">Drive Pico events <span>link changes, failsafe trips, rejected lines · newest first</span></h2>
       <div class="events" id="pico-events" aria-live="polite"></div>
     </section>
 
@@ -611,7 +611,7 @@ function renderTable(raw, pico) {
     ["Tailscale", raw.tailscale ? `${raw.tailscale.state}, ${raw.tailscale.ip}` : "–", "tailscale status"],
     ["Uptime", raw.uptime_s != null ? `${Math.round(raw.uptime_s)} s` : "–", "/proc/uptime"],
     ...(pico ? pico.tiles.map(t => [t.title, `${t.value}${t.detail ? " · " + t.detail.replace(/\n/g, " · ") : ""}`,
-                                    "forrest-pico monitor (STAT reply to \"?\")"]) : []),
+                                    t.source || "forrest-pico monitor"]) : []),
   ];
   const tb = $("table"); tb.innerHTML = "";
   for (const [a, b, c] of rows) {
@@ -883,7 +883,7 @@ async function tick() {
     const L = limits;
     $("footer").textContent = `Read-only · tailnet only · limits — CPU temp: caution ${L.cpu_temp?.[0]} °C, throttle ${L.cpu_temp?.[1]} °C · ` +
       `AI HAT: caution ${L.hailo_temp?.[0]} °C · Wi-Fi: caution below ${L.wifi_dbm?.[0]} dBm · input: caution below ${L.input_v?.[0]} V · ` +
-      `Pico loop: caution ${L.pico_gap_ms?.[0]} ms, limit ${L.pico_gap_ms?.[1]} ms`;
+      `Drive loop: caution ${L.pico_gap_ms?.[0]} ms, limit ${L.pico_gap_ms?.[1]} ms`;
     lastOk = Date.now();
   } catch (e) {
     if (Date.now() - lastOk > 6000) {

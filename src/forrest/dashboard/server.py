@@ -60,7 +60,8 @@ def make_handler(vision):
                 self._send(200, PAGE.read_bytes(), "text/html; charset=utf-8")
             elif path == "/api/status":
                 # The Pico panel reads the monitor's state file; the dashboard never opens the port.
-                pico = pico_panel.panel(pico_panel.read_state(pico_state), time.time())
+                pico = pico_panel.panel(pico_panel.read_state(pico_state), time.time(),
+                                       pico_panel.usb_ports())
                 body = {"hardware": monitor.read(), "limits": LIMITS, "pico": pico,
                         # sensors not fitted yet: env/gps/battery pass None until their drivers exist
                         "sidebar": sidebar(pico=pico),

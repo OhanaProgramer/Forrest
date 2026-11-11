@@ -19,7 +19,7 @@ def test_no_sensors_are_placeholders():
     assert rows(s, "gps")["Position"]["detail"] == "no GPS yet"
     robot = rows(s, "robot")
     assert robot["Battery"]["level"] == "na"
-    assert robot["Pico"]["detail"] == "monitor not running"
+    assert robot["Drive Pico"]["detail"] == "monitor not running"
 
 
 def test_with_readings():
@@ -33,9 +33,17 @@ def test_with_readings():
     assert gps["Speed"]["detail"] == "heading 4°"
     robot = rows(s, "robot")
     assert robot["Battery"]["value"] == "11.80 V"
-    assert robot["Pico"]["value"] == "up" and robot["Drive"]["value"] == "failsafe"
+    assert robot["Drive Pico"]["value"] == "up" and robot["Drive"]["value"] == "failsafe"
 
 
 def test_gps_without_fix_is_a_caution():
     g = rows(sidebar(gps={"lat": 0, "lon": 0, "sats": 2, "fix": False}), "gps")
     assert g["Position"]["value"] == "no fix" and g["Position"]["level"] == "warn"
+
+
+def test_sensor_pico_row_when_the_panel_has_it():
+    from forrest.dashboard.sidebar import sidebar
+    pico = {"tiles": PICO_UP["tiles"] + [{"key": "pico_sensors", "value": "on USB", "level": "ok"}]}
+    robot = {r["label"]: r for r in next(s for s in sidebar(pico=pico) if s["key"] == "robot")["rows"]}
+    assert robot["Sensor Pico"]["value"] == "on USB"
+    assert robot["Drive Pico"]["value"] == "up"

@@ -346,7 +346,7 @@ GROUPS = [
     ("power", "Power", "is the supply clean?"),
     ("system", "System", "is it keeping up?"),
     ("network", "Network", "can I reach it?"),
-    ("pico", "Pico", "is the safety bridge alive?"),
+    ("pico", "Picos", "are the drive and sensor boards there?"),
 ]
 TILE_GROUP = {"cpu_temp": "thermal", "hailo": "thermal", "fan": "thermal",
               "power": "power",

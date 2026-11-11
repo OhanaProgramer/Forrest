@@ -26,7 +26,7 @@ def test_up_shows_four_tiles_in_the_pico_group():
     p = dp.panel(snap(), NOW)
     t = by_key(p)
     assert p["monitor"] == "running"
-    assert list(t) == ["pico_link", "pico_drive", "pico_loop", "pico_trips"]
+    assert list(t) == ["pico_link", "pico_drive", "pico_loop", "pico_trips", "pico_sensors"]
     assert all(x["group"] == "pico" for x in p["tiles"])
     assert "pico" in [g[0] for g in GROUPS]
     assert t["pico_link"]["value"] == "up" and t["pico_link"]["level"] == "ok"
@@ -53,7 +53,7 @@ def test_commanded_and_last_trip_time():
 
 def test_not_connected_is_a_caution_and_hides_the_rest():
     p = dp.panel(snap(link="no_device", port=None, stat=None, failsafe=None), NOW)
-    assert [t["key"] for t in p["tiles"]] == ["pico_link"]
+    assert [t["key"] for t in p["tiles"]] == ["pico_link", "pico_sensors"]    # drive detail tiles hidden
     assert p["tiles"][0]["value"] == "not connected" and p["tiles"][0]["level"] == "warn"
 
 
@@ -78,3 +78,47 @@ def test_read_state(tmp_path):
     assert dp.read_state(f) is None
     f.write_text(json.dumps(snap()))
     assert dp.read_state(f)["link"] == "up"
+
+
+# -- other boards: USB presence only (2026-11-10) -------------------------------
+
+from types import SimpleNamespace
+
+from forrest.drivers.pico import BOARDS
+
+
+def _port(dev, serial, vid=0x2E8A, pid=0x0005):
+    return SimpleNamespace(device=dev, vid=vid, pid=pid, serial_number=serial)
+
+
+def test_sensor_board_on_usb_is_ok_presence_only():
+    p = dp.panel(snap(), NOW, [_port("/dev/ttyACM1", BOARDS["sensors"].upper())])
+    t = by_key(p)
+    assert list(t)[-1] == "pico_sensors"                           # after the drive tiles
+    assert t["pico_sensors"]["value"] == "on USB" and t["pico_sensors"]["level"] == "ok"
+    assert "/dev/ttyACM1" in t["pico_sensors"]["detail"] and "not monitored" in t["pico_sensors"]["detail"]
+    assert t["pico_sensors"]["group"] == "pico" and "not opened" in t["pico_sensors"]["source"]
+    assert "pico_unknown" not in t
+
+
+def test_sensor_board_missing_is_a_caution():
+    t = by_key(dp.panel(snap(), NOW, []))
+    assert t["pico_sensors"]["value"] == "not connected" and t["pico_sensors"]["level"] == "warn"
+
+
+def test_board_tiles_shown_even_when_the_monitor_is_stopped():
+    t = by_key(dp.panel(None, NOW, [_port("/dev/ttyACM0", BOARDS["sensors"])]))
+    assert t["pico_link"]["level"] == "na" and t["pico_sensors"]["value"] == "on USB"
+
+
+def test_unknown_micropython_board_is_flagged_other_devices_ignored():
+    ports = [_port("/dev/ttyACM2", "deadbeef00000000"),
+             _port("/dev/ttyUSB0", "0001", vid=0x10C4, pid=0xEA60)]     # LIDAR adapter: not a Pico
+    t = by_key(dp.panel(snap(), NOW, ports))
+    assert t["pico_unknown"]["value"] == "1" and t["pico_unknown"]["level"] == "warn"
+    assert "deadbeef00000000" in t["pico_unknown"]["detail"] and "ttyUSB0" not in t["pico_unknown"]["detail"]
+
+
+def test_drive_missing_names_its_serial():
+    p = dp.panel(snap(link="no_device", port=None, stat=None, failsafe=None), NOW)
+    assert BOARDS["drive"] in p["tiles"][0]["detail"]
