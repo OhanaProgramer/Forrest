@@ -56,3 +56,34 @@ the alarm has been seen to work. That's the Jr success line.
 - ESD mat with its ground cord connected; touch it before handling boards.
 - Charge LiPos in the LiPo bag, on a hard surface, while you're home.
 - Never run the pack below the alarm. Store packs part-charged, not full.
+
+## Power measurement (bench instrument)
+
+We have an ATORCH DC power/energy meter (color screen, Bluetooth; model on the
+unit). Use it to replace *estimated* power numbers with *measured* ones during
+B1/B2. Not a permanent part — it's the bench instrument.
+
+What it gives us that a basic USB stick meter doesn't:
+- Integrates over time: live V / A / W **plus** running Wh, mAh and a timer.
+  Wh over a known run time is the runtime math directly.
+- Bluetooth logging to a phone app (time-series + CSV export) — capture a sweep
+  hands-off instead of reading the screen.
+- DC input rated 5-30 V on the screw terminals, not USB-only — so the same
+  meter reads the **battery** side too, not just the 5 V compute input.
+- Current ceiling ~5 A: fine for the compute pack (~2 A). The drive pack's tens
+  of amps exceeds it — that rail is an INA226 + external-shunt job, later.
+
+Wire it **inline**: supply -> meter IN -> meter OUT -> load. (An open circuit
+reads `0.000 A` / `999999 Ω` — that's "nothing flowing," not a fault.)
+
+Operating points to capture (compute 5 V input, on the B1 rig):
+1. Pi idle
+2. + Hailo under load (run a detection)
+3. + LIDAR spinning
+4. all together — the real operating point
+
+Note peak vs average at each: average sizes runtime, peaks size headroom.
+
+The permanent on-board version of this is an INA219 on the compute pack
+(I2C -> Pico `P,` telemetry lane -> dashboard power card), added later. Design
+reason lives in Continuity (SYSTEMS.md, power telemetry).
