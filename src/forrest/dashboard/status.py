@@ -222,6 +222,12 @@ def sample(raw: dict) -> dict:
     }
 
 
+def next_deadline(prev: float, now: float, every: float) -> float:
+    """The next sample time: `every` after the last one, but never in the past,
+    so a late or stalled loop skips missed slots instead of bursting through them."""
+    return max(prev + every, now)
+
+
 class Monitor:
     """Samples hardware every `every` seconds in a background thread and keeps
     `history_s` seconds of history, so trends exist as soon as a page opens.
@@ -252,11 +258,14 @@ class Monitor:
         return self
 
     def _run(self) -> None:
-        nxt = time.time()
+        # Monotonic, not wall time: this Pi has no RTC, so NTP jumps the wall clock
+        # forward after boot, and a wall-clock schedule then samples back-to-back to
+        # "catch up", filling the 30-min history with a few seconds of rows.
+        nxt = time.monotonic()
         while True:
             self._sample_once()
-            nxt += self.every
-            time.sleep(max(0.0, nxt - time.time()))
+            nxt = next_deadline(nxt, time.monotonic(), self.every)
+            time.sleep(max(0.0, nxt - time.monotonic()))
 
     def _sample_once(self) -> dict:
         r = self._read()

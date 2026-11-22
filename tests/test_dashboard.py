@@ -141,3 +141,18 @@ def test_server_routes_without_camera():
     finally:
         httpd.shutdown()
         httpd.server_close()
+
+
+def test_next_deadline_steady():
+    from forrest.dashboard.status import next_deadline
+    assert next_deadline(100.0, 100.5, 2.0) == 102.0
+
+
+def test_next_deadline_never_bursts_after_stall():
+    # e.g. a stalled read or a clock jump: the next slot is "now", not a backlog
+    # of past slots sampled back-to-back (which squashed the 30-min charts).
+    from forrest.dashboard.status import next_deadline
+    t, now = 100.0, 10_000.0
+    t = next_deadline(t, now, 2.0)
+    assert t == now
+    assert next_deadline(t, now, 2.0) == now + 2.0
