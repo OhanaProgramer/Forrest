@@ -24,7 +24,20 @@ finished items are deleted from here.
 - **Held for tomorrow (Jacque):** rotate the Claude token (it showed in a pasted error), then
   delete the .bashrc backup; `git stash drop` (old dashboard draft); restart forrest-dash
   (still running pre-pull code); start Phase 0 of the checklist.
-- **Discuss first thing:** UWB runner tag (Open item below). Don't buy the Feather RFM69
+- **Decided tonight (Jacque): keep the transmitter as Jr's kill switch; "no transmitter" is a
+  Sr goal.** UWB and the custom radio kill switch were a big requirement jump for Jr, so they're
+  parked for Sr (see the 11-21 Open items; queue them to PARKING_LOT, not DECISIONS, as Sr
+  ideas). How the transmitter kills it, through the drive Pico (receiver → Pico → ESC/servo):
+  1. Any trigger/wheel input past a dead zone locks the Pi out. Control stays manual after you
+     let go, until a deliberate hand-back (dashboard button or stick gesture).
+  2. Lost receiver signal means neutral, and the Pi may not drive.
+     **Test first:** does the TQi receiver stop sending pulses with the transmitter off, or
+     send neutral pulses? If it sends neutral, the Pico can't detect the loss and #1 is the
+     kill switch.
+  3. Pi silent means neutral (the existing Pico failsafe, 514 ms measured).
+  Tomorrow: trim the checklist (move the 7 kill-switch items + "retire the transmitter" out;
+  keep the IMU flip stop). Buy only the IMU + STEMMA QT cables; no Feather radios, no UWB.
+- (Superseded by the line above) Discuss first thing: UWB runner tag (Open item below). Don't buy the Feather RFM69
   radios until that's decided. The IMU and the STEMMA QT cables are fine to buy either way.
 - Nothing left holding the camera or Hailo. forrest-dash and forrest-pico are running as usual.
 - Mac to-do: pull; apply the queued Continuity edits (11-21, 11-10, 11-08, 11-04).
