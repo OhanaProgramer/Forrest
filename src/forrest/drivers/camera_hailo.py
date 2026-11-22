@@ -93,23 +93,25 @@ class VisionLoop(threading.Thread):
             with self._lock:
                 self._running = True
             try:
-                last_view, t_fps, n_fps = 0.0, time.time(), 0
+                # timers on the monotonic clock (NTP can't move it); `now` stays wall
+                # time because it is a timestamp handed to on_detections
+                last_view, t_fps, n_fps = -1e9, time.monotonic(), 0
                 vw, vh = self.view_size
                 while not self._halt.is_set():
                     (view, lores), _meta = cam.capture_arrays(["main", "lores"])
                     dets = parse_nms(hailo.run(lores), self.threshold)
-                    now = time.time()
+                    now, mono = time.time(), time.monotonic()
                     n_fps += 1
                     with self._lock:
                         self._frames += 1
                         self._detections = dets
-                        if now - t_fps >= 1.0:
-                            self._fps = n_fps / (now - t_fps)
-                            t_fps, n_fps = now, 0
+                        if mono - t_fps >= 1.0:
+                            self._fps = n_fps / (mono - t_fps)
+                            t_fps, n_fps = mono, 0
                     if self.on_detections:
                         self.on_detections(now, dets)
-                    if now - last_view >= self.view_period:
-                        last_view = now
+                    if mono - last_view >= self.view_period:
+                        last_view = mono
                         img = cv2.resize(view[:, :, :3], self.view_size, interpolation=cv2.INTER_AREA)
                         for d in dets:
                             p0 = (int(d.x0 * vw), int(d.y0 * vh))
