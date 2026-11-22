@@ -15,7 +15,26 @@ finished items are deleted from here.
 5. Who edits code: either machine may change this repo. Hardware drivers and
    bench runs are done on forrest-jr; say in the item which machine owns a change.
 
-## Resume here (end of day 2026-11-21, forrest-jr)
+## Resume here (2026-11-22, forrest-jr)
+- **Jr is headless now** (Jacque ran `raspi-config nonint do_boot_behaviour B1`): boots to
+  `multi-user.target`, no desktop, no autologin. The user services still start at boot
+  (linger on). Git uses `~/.ssh/forrest_deploy` (no passphrase, no keyring needed). After the
+  reboot at 12:34: forrest-dash/pico/lidar all came up active, camera + Hailo at 30.0 fps,
+  `/stream` serving, HTTP 200, 859 MB RAM used (was 1,743 MB with the desktop), 47 C, throttled=0x0.
+  This also completes the **reboot test with the camera at boot** (3432367). Undo: `do_boot_behaviour B4`.
+- Done today (commits f29f579..3432367): LIDAR dashboard view + `forrest-lidar` monitor service;
+  monotonic-clock fixes for the history sampler and camera fps; forrest-dash runs `--camera` at boot.
+  SSH from the MacBook, the dashboard and the camera stream were all tested by Jacque. `git stash drop` done.
+- **Next: bench B1.** Jacque is plugging in the RPLIDAR C1 (`/dev/ttyUSB0`; the monitor is waiting
+  for it) → watch the radar go live. Then: the drive Pico back on USB + P3 soak; trim the
+  checklist (kill-switch items out); TQi receiver test (no pulses or neutral with TX off?);
+  Wi-Fi drop with the camera running (still untested).
+- Still open: confirm the Claude token was rotated; `~/.bashrc.bak-20261106090231` remains
+  (check it for the old token, then delete).
+- Mac to-do: pull; apply the queued Continuity edits (11-21, 11-10, 11-08, 11-04); add to
+  USER.md/local_IT: forrest-jr is headless (console boot) from 2026-11-22.
+
+## Previous (end of day 2026-11-21, forrest-jr)
 - Done today: fixed ~/.bashrc (broken CLAUDE_CODE_OAUTH_TOKEN lines; backup
   ~/.bashrc.bak-2026-11-21, chmod 600). Repo reconciled with origin: the stashed dashboard
   draft was already upstream (11f0b18), so upstream was kept; 78 tests pass.
