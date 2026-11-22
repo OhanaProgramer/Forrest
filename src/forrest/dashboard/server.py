@@ -4,6 +4,7 @@
     /stream        live annotated view (MJPEG)
     /api/status    hardware status + vision status + Pico panel (JSON)
     /api/history   the last 30 min of samples, as columns (JSON)
+    /api/lidar     the latest LIDAR rotation for the radar (JSON, small; polled ~4x/s)
 
 Read-only by design: nothing here moves hardware. Bind it to the Tailscale
 address so it is reachable from the tailnet only.
@@ -19,9 +20,11 @@ from typing import Optional
 
 import time
 
+from forrest.dashboard import lidar as lidar_panel
 from forrest.dashboard import pico as pico_panel
 from forrest.dashboard.sidebar import sidebar
 from forrest.dashboard.status import GROUPS, LIMITS, Monitor
+from forrest.health import lidar_monitor
 from forrest.health.pico_monitor import default_state_path
 
 PAGE = Path(__file__).with_name("index.html")
@@ -41,6 +44,10 @@ def make_handler(vision):
     """`vision` is a VisionLoop, or None to run without a camera (the default)."""
     monitor = Monitor().start()
     pico_state = default_state_path()
+    lidar_state = lidar_monitor.default_state_path()
+
+    def lidar_now() -> dict:
+        return lidar_panel.panel(pico_panel.read_state(lidar_state), time.time())
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, fmt, *args):  # keep the terminal quiet
@@ -65,11 +72,13 @@ def make_handler(vision):
                 body = {"hardware": monitor.read(), "limits": LIMITS, "pico": pico,
                         # sensors not fitted yet: env/gps/battery pass None until their drivers exist
                         "sidebar": sidebar(pico=pico),
-                        "lidar": {"running": False, "error": "no LIDAR yet (bench test B1 not run)"},
+                        "lidar": {k: v for k, v in lidar_now().items() if k != "bins"},
                         "groups": [{"key": k, "title": t, "question": q} for k, t, q in GROUPS],
                         "vision": vision.status() if vision else {"running": False,
                                                                   "error": "camera off (start with --camera)"}}
                 self._send(200, json.dumps(body).encode(), "application/json")
+            elif path == "/api/lidar":
+                self._send(200, json.dumps(lidar_now()).encode(), "application/json")
             elif path == "/api/history":
                 q = self.path.partition("?")[2]
                 since = float(q.split("since=", 1)[1].split("&")[0]) if "since=" in q else None

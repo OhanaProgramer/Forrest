@@ -1,6 +1,7 @@
 """The `forrest` command: bench tools for B1 (LIDAR) and B2 (power soak).
 
     forrest lidar check  [--port P]             # info, health, live 8-sector view
+    forrest lidar monitor [--port P]            # scan forever, feed the dashboard radar
     forrest lidar record OUT.jsonl [--seconds N]
     forrest lidar view   [--replay FILE.jsonl]  # plot (needs the [viz] extra)
     forrest soak         [--minutes 60]         # B2: LIDAR spinning + power log
@@ -67,6 +68,14 @@ def cmd_lidar_check(args) -> int:
 # ---------------------------------------------------------------------------
 # lidar record  (capture real scans to replay on the Mac)
 # ---------------------------------------------------------------------------
+
+def cmd_lidar_monitor(args) -> int:
+    from forrest.health import lidar_monitor
+    state = Path(args.state) if args.state else lidar_monitor.default_state_path()
+    print(f"LIDAR monitor on {args.port}: state -> {state} (Ctrl-C to stop)")
+    lidar_monitor.run(state, lambda: _open_lidar(args.port))
+    return 0
+
 
 def cmd_lidar_record(args) -> int:
     out = Path(args.out)
@@ -350,6 +359,11 @@ def main(argv=None) -> int:
     c = lsub.add_parser("check", help="info, health and a live sector view")
     c.add_argument("--port", default=DEFAULT_PORT)
     c.set_defaults(func=cmd_lidar_check)
+
+    m = lsub.add_parser("monitor", help="scan forever; write the latest rotation for the dashboard radar")
+    m.add_argument("--port", default=DEFAULT_PORT)
+    m.add_argument("--state", help="state file (default: $XDG_RUNTIME_DIR/forrest/lidar.json)")
+    m.set_defaults(func=cmd_lidar_monitor)
 
     r = lsub.add_parser("record", help="save scans to a .jsonl file")
     r.add_argument("out")

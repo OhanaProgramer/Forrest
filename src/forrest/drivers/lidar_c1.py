@@ -14,6 +14,11 @@ Datasheet notes that matter here:
     600 mA total unless `usb_max_current_enable=1` is in config.txt.
   * Typical scan rate 10 Hz (8-12 Hz), ~5,000 samples/s, 0.72 deg resolution.
 
+Measured on the real unit (B1, 2026-11-10): model 65, firmware 1.02, hardware 18.
+After the SCAN command the descriptor comes at once, but the first sample only
+after 2.2-2.4 s (motor spin-up); then ~29 kB/s (~5,800 samples/s). DTR on the
+CP2102N adapter makes no difference (the C1 runs its own motor).
+
 Status: written against the published protocol and unit-tested with synthetic
 bytes. Not yet run against the real unit -- B1 is that test.
 """
@@ -45,6 +50,7 @@ TYPE_INFO = 0x04
 TYPE_HEALTH = 0x06
 
 SAMPLE_LEN = 5
+SPINUP_TIMEOUT_S = 5.0   # first sample after SCAN: measured 2.2-2.4 s, so 2x margin
 HEALTH_STATUS = {0: "good", 1: "warning", 2: "error"}
 
 
@@ -137,12 +143,13 @@ class LidarC1:
     """
 
     def __init__(self, port: str = "/dev/ttyUSB0", baud: int = DEFAULT_BAUD,
-                 timeout: float = 1.0, serial_port=None):
+                 timeout: float = 1.0, serial_port=None, clock=time.monotonic):
         if serial_port is None:
             import serial  # imported here so tests run without pyserial
 
             serial_port = serial.Serial(port, baud, timeout=timeout)
         self._serial = serial_port  # tests pass a fake with the same methods
+        self._clock = clock
         self._scanning = False
 
     # -- context manager -------------------------------------------------
@@ -162,8 +169,14 @@ class LidarC1:
     def _send(self, cmd: int) -> None:
         self._serial.write(bytes([SYNC, cmd]))
 
-    def _read_exact(self, n: int) -> bytes:
+    def _read_exact(self, n: int, within_s: Optional[float] = None) -> bytes:
+        """n bytes, or LidarError. By default one serial read (its timeout, 1 s);
+        with `within_s`, keep reading until that many seconds have passed."""
         data = self._serial.read(n)
+        if within_s is not None:
+            deadline = self._clock() + within_s
+            while len(data) < n and self._clock() < deadline:
+                data += self._serial.read(n - len(data))
         if len(data) != n:
             raise LidarError(f"timed out: wanted {n} bytes, got {len(data)}")
         return data
@@ -206,7 +219,7 @@ class LidarC1:
 
         points: list[ScanPoint] = []
         started = False
-        raw = self._read_exact(SAMPLE_LEN)
+        raw = self._read_exact(SAMPLE_LEN, within_s=SPINUP_TIMEOUT_S)   # motor spin-up
         while self._scanning:
             decoded = parse_sample(raw)
             if decoded is None:

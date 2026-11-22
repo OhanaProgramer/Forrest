@@ -1,0 +1,16 @@
+# Forrest LIDAR monitor as a systemd *user* service. Runs the RPLIDAR C1 and writes
+# the latest rotation to $XDG_RUNTIME_DIR/forrest/lidar.json for forrest-dash's radar.
+# Install: pi/systemd/install-lidar.sh   (linger is already on for forrest-dash)
+# While it runs it holds the LIDAR's port and keeps the motor turning:
+# stop it before `forrest lidar check` / `record` / `view`.
+[Unit]
+Description=Forrest LIDAR monitor (forrest lidar monitor, feeds the radar)
+
+[Service]
+WorkingDirectory=%h/Projects/02_builds/forrest
+ExecStart=%h/Projects/02_builds/forrest/.venv/bin/forrest lidar monitor
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

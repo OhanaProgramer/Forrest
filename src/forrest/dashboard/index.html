@@ -170,6 +170,10 @@
   #radar .ring { fill:none; stroke:var(--grid); }
   #radar .axis { stroke:var(--axis); stroke-dasharray:2 3; }
   #radar .bot { fill:var(--s1); }
+  #radar .free { fill:var(--s1-wash); stroke:none; }
+  #radar .pt { fill:var(--s1); }
+  #radar .near { fill:var(--s2); }
+  #radar .nlab { fill:var(--ink-2); font-size:7.5px; font-variant-numeric:tabular-nums; }
   #radar text { font-size:7px; }
   .camframe { position:relative; width:100%; }
   #view { width:100%; aspect-ratio:4/3; background:#000; border-radius:6px; display:block; }
@@ -791,6 +795,7 @@ function showOffline() {
   $("cam-fps").textContent = "";
   $("radar-msg").hidden = false;
   $("radar-msg").textContent = "OFFLINE";
+  if ($("radar-pts")) $("radar-pts").innerHTML = "";        // no stale points that look live
 }
 // the stream connection itself dropped while the page is still connected: try again in 2 s
 $("view").addEventListener("error", () => {
@@ -843,11 +848,52 @@ function drawRadarFrame() {
   el("line", { class: "axis", x1: 0, y1: -100, x2: 0, y2: 100 }, svg);
   el("polygon", { class: "bot", points: "0,-6 4.5,5 0,2.5 -4.5,5" }, svg);   // robot, pointing forward
 }
+// Drawn from /api/lidar (polled fast, below). bins[i] = nearest distance in the
+// i-th bin, clockwise from the LIDAR's forward mark; null = nothing seen.
+// Shaded area = what the LIDAR sees as clear (out to the first return, or the
+// edge); dots = returns; orange = the nearest one, with its distance.
 function renderRadar(l) {
-  const msg = $("radar-msg");
-  if (l && l.running) { msg.hidden = true; return; }      // live points: next step (after B1)
-  msg.hidden = false;
-  msg.textContent = (l && l.error) || "no LIDAR";
+  const msg = $("radar-msg"), svg = $("radar");
+  let g = $("radar-pts");
+  if (!g) { g = el("g", { id: "radar-pts" }, null); svg.insertBefore(g, svg.querySelector(".bot")); }
+  g.innerHTML = "";
+  if (!l || !l.running || !l.bins) {
+    msg.hidden = false;
+    msg.textContent = (l && l.error) || "no LIDAR";
+    $("radar-sub").textContent = "LIDAR, top-down · rings every 1 m";
+    return;
+  }
+  msg.hidden = true;
+  const k = 100 / RADAR_M, step = l.bin_deg || 2;
+  const xy = (i, r) => { const a = (i + 0.5) * step * Math.PI / 180; return [r * k * Math.sin(a), -r * k * Math.cos(a)]; };
+  el("polygon", { class: "free", points: l.bins.map((d, i) => xy(i, d == null ? RADAR_M : Math.min(d, RADAR_M)).join(",")).join(" ") }, g);
+  let ni = -1;
+  l.bins.forEach((d, i) => {
+    if (d == null) return;
+    if (ni < 0 || d < l.bins[ni]) ni = i;
+    if (d > RADAR_M) return;
+    const [x, y] = xy(i, d);
+    el("circle", { class: "pt", cx: x.toFixed(1), cy: y.toFixed(1), r: 1.3 }, g);
+  });
+  if (ni >= 0 && l.bins[ni] <= RADAR_M) {
+    const [x, y] = xy(ni, l.bins[ni]);
+    el("circle", { class: "near", cx: x.toFixed(1), cy: y.toFixed(1), r: 2.6 }, g);
+    const t = el("text", { class: "nlab", x: (x + 4).toFixed(1), y: (y - 3).toFixed(1) }, g);
+    t.textContent = `${l.bins[ni].toFixed(2)} m`;
+  }
+  $("radar-sub").textContent = `${l.rate_hz.toFixed(1)} Hz · ${l.points} pts` +
+    (ni >= 0 ? ` · nearest ${l.bins[ni].toFixed(2)} m at ${Math.round((ni + 0.5) * step)}°` : "") + " · rings 1 m";
+}
+
+// Fast radar poll (~4/s), separate from the 2 s status tick. Skips while the tab
+// is hidden or the Pi is offline, and never overlaps itself.
+let radarBusy = false;
+async function radarTick() {
+  if (radarBusy || document.hidden || document.body.classList.contains("offline")) return;
+  radarBusy = true;
+  try { renderRadar(await (await fetch("/api/lidar", { cache: "no-store" })).json()); }
+  catch (e) { /* the status tick handles going offline */ }
+  finally { radarBusy = false; }
 }
 drawRadarFrame();
 
@@ -877,7 +923,7 @@ async function tick() {
     renderTable(raw, s.pico);
     renderPicoEvents(s.pico);
     renderSidebar(s.sidebar);
-    renderRadar(s.lidar);
+    if (!s.lidar || !s.lidar.running) renderRadar(s.lidar);   // live points come from radarTick
     renderCamera(s.vision);
     if (!$("history-wrap").hidden) drawCharts();
     const L = limits;
@@ -898,6 +944,7 @@ async function tick() {
 window.addEventListener("resize", () => { if (hist && !$("history-wrap").hidden) drawCharts(); });
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", tick);
 tick(); setInterval(tick, 2000);
+radarTick(); setInterval(radarTick, 250);
 </script>
 </body>
 </html>
