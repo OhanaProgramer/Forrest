@@ -165,8 +165,68 @@ finished items are deleted from here.
      "no sensor" until wired, host tests, its own deploy by serial) → sensor monitor →
      tiles. Then BME688 + INA219 when the cable arrives. Read every few seconds;
      BME688 trigger-then-collect so a read never blocks. INA219 range: ask Jacque what it measures.
+5. **RC car: Jr's drive base (on hand 2026-11-21, forrest-jr owns integration).**
+   Starts after the compute-core checkout (bench B1/B2 + sensors). Checklist:
+   https://claude.ai/artifact/EtfnFqFpPchsKh8wkbou4Q (phase 7).
+   - **Done 2026-11-21:** drives on its own transmitter (Jacque tested, stock setup).
+   - **Parts (Traxxas Slash 2WD Brushless, model 58434-4).** Per the Traxxas page / a
+     retailer listing; check each against the car and the manual:
+     | Part | What it is | Check on the car |
+     |---|---|---|
+     | ESC | Velineon VX3, waterproof brushless; Sport / Race / Training profiles | BEC voltage; LiPo low-voltage detection on; signal plug |
+     | Motor | Velineon V3200, 3200 Kv sensorless brushless (retailer listing only) | label on the can |
+     | Steering servo | Traxxas 2057, metal gear, waterproof | end stops in µs |
+     | Radio | TQi Sport 2.4 GHz, **2 channels** (steering, throttle), TSM | receiver failsafe goes to neutral with TX off |
+     | Drive battery | one 2S or 3S LiPo (VX3 does not take NiMH); bay 166 x 49 x 28 mm | which pack; separate from the compute 3S |
+   - Integration notes:
+     - Only 2 channels, so there is no spare switch channel for auto/manual. Manual
+       override has to come from the sticks: any stick input wins over the Pi.
+     - TSM (stability management) runs in the receiver. Note whether it changes the
+       pulses the Pico reads, and decide on/off for the bench.
+     - Keep Training Mode (reduced power) on the ESC for the first rolls.
+     - The Pico sits between the receiver and the ESC/servo (servo-PWM, common ground,
+       signal wires only). Its power must not depend on the Pi's USB.
+     - **Jacque, 2026-11-21: the goal is no transmitter at all.** It stays only as a
+       development safety tool until the runner kill switch is proven (decision queued
+       below for Continuity).
 
 ## Open
+
+### [jr→mac] 2026-11-21 — Continuity edits: transmitter retired later, runner kill switch, IMU (MacBook only)
+- **DECISIONS.md**, append: `## 2026-11-21 — Forrest Jr: no transmitter in the end; runner kill switch replaces it`
+  - Jacque: Jr should not need the RC transmitter. Supersedes "the Pico reads the RC
+    receiver; manual override wins" (2026-10-22 Jr direction).
+  - Until the kill switch passes its tests, the stock TQi (2-channel, no spare switch) stays
+    in use as a development safety tool for the bench, first rolls and M5. The override
+    latches: touching the sticks takes control, and handing back takes a deliberate act.
+    No transmitter signal means stop.
+  - **Runner kill switch = heartbeat, not a button signal.** A handheld radio sends "alive"
+    about every 50 ms. A radio on the car holds a run-permit wire to the drive Pico high only
+    while those messages arrive. Pressing the button, a dead battery, out of range or a
+    cut wire all mean stop, within about 250 ms (starting value). It goes straight to the
+    drive Pico and never through the Pi.
+    Why not a cheap RF key fob: it only transmits on a press, so it can't tell when its
+    signal is lost.
+  - **IMU for tilt / flip / impact** (6-DoF accel + gyro, STEMMA QT) on the sensor Pico W.
+    Stop on upside down, tipped over or a hard impact. v1 path: sensor Pico → Pi → stop
+    command. The kill switch and the Pico failsafe remain the hard safety layer. Move the
+    flip stop onto the drive Pico later if the Pi path proves too slow.
+    An accelerometer can't measure speed ("too fast") reliably, because integrating it
+    drifts within seconds. Speed needs wheel speed (a Hall sensor + magnet on the drivetrain,
+    read by the drive Pico) or GPS. That's a later part.
+- **SYSTEMS.md** area 11 (Safety): add the runner kill switch design and the tests
+  (press → stop, handheld off → stop, range 5–10 m while running).
+- **SYSTEMS.md** Jr parts (all Adafruit; buy now for the next milestones):
+  | Part | Adafruit PID | Qty | Serves |
+  |---|---|---|---|
+  | Feather RP2040 RFM69 Packet Radio, 868/915 MHz (use 915 in the US) | 5712 | 2 | kill switch (handheld + car) |
+  | ISM330DHCX 6-DoF IMU, STEMMA QT (-40 to +105 °C); or LSM6DSOX, PID 4438 | 4502 | 1 | flip / tilt / impact |
+  | STEMMA QT to male header cable, 150 mm (for a bare Pico W or breadboard) | 4209 | 2 | sensor chain to Pico W |
+  | STEMMA QT cable, JST SH both ends (sensor to sensor) | check | 2 | daisy chain |
+  | Small LiPo + momentary button + enclosure for the handheld | check | 1 | kill switch handheld |
+  If the Pico W has male headers soldered on, it needs the STEMMA QT cable with female
+  sockets instead of 4209.
+  I²C addresses don't clash: INA219 0x40, IMU 0x6A, BME688 0x77.
 
 ### [jr→mac] 2026-11-09 — Camera architecture for car-detection (explored; park until that phase; nothing to buy)
 Propose into DECISIONS.md / SYSTEMS.md:
