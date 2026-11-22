@@ -15,16 +15,19 @@ finished items are deleted from here.
 5. Who edits code: either machine may change this repo. Hardware drivers and
    bench runs are done on forrest-jr; say in the item which machine owns a change.
 
-## Resume here (end of day 2026-11-04)
-- Done today: hoverboard removed; camera + Hailo verified (29.9 fps); `forrest view`
-  window; dashboard steps 1-2 at http://100.123.84.14:8090/ (dark, tailnet only).
-- `forrest dash` (status only, no camera) now **starts at boot** as the user service
-  `forrest-dash` (`pi/systemd/`, linger on). Camera and Hailo are free.
-  Control: `systemctl --user status|restart|stop forrest-dash`; logs: `journalctl --user -u forrest-dash`.
-  For detections, stop the service and run `.venv/bin/forrest dash --camera` by hand.
-- Open: green cast on the ov5647 (white measures about R 98 / G 168 / B 166);
-  detection log; camera panel on the page.
-- Mac to-do: the Continuity edits below (the hoverboard "why" is now filled in below — ready to move to DECISIONS.md).
+## Resume here (end of day 2026-11-21, forrest-jr)
+- Done today: fixed ~/.bashrc (broken CLAUDE_CODE_OAUTH_TOKEN lines; backup
+  ~/.bashrc.bak-2026-11-21, chmod 600). Repo reconciled with origin: the stashed dashboard
+  draft was already upstream (11f0b18), so upstream was kept; 78 tests pass.
+  RC car on hand (Now item 5). Integration checklist:
+  https://claude.ai/artifact/EtfnFqFpPchsKh8wkbou4Q (ticks save there).
+- **Held for tomorrow (Jacque):** rotate the Claude token (it showed in a pasted error), then
+  delete the .bashrc backup; `git stash drop` (old dashboard draft); restart forrest-dash
+  (still running pre-pull code); start Phase 0 of the checklist.
+- **Discuss first thing:** UWB runner tag (Open item below). Don't buy the Feather RFM69
+  radios until that's decided. The IMU and the STEMMA QT cables are fine to buy either way.
+- Nothing left holding the camera or Hailo. forrest-dash and forrest-pico are running as usual.
+- Mac to-do: pull; apply the queued Continuity edits (11-21, 11-10, 11-08, 11-04).
 
 ## Now (forrest-jr, from 2026-11-04)
 1. **HAT + camera ops test** on the Pi (Hailo-8 + ov5647): live detection runs,
@@ -191,6 +194,24 @@ finished items are deleted from here.
        below for Continuity).
 
 ## Open
+
+### [jr→mac] 2026-11-21 — UWB runner tag: first cost look (discuss in the morning; nothing bought)
+Idea (Jacque): the runner carries a device, so the cart knows exactly where he is.
+UWB (ultra-wideband, the radio in AirTags) times radio pulses between a tag on the runner
+and anchors on the cart: distance to ~10 cm and, with 2+ anchors or an angle-measuring
+(PDoA) anchor, direction too. It isn't affected by sun or dark, and it can't mistake another
+person for him. It could do three jobs: follow (area 3), a kill-switch button, and a
+dead-man stop when the link drops (area 11). The LIDAR stays for obstacles.
+Prices from distributor pages, undated; check before buying:
+| Option | What you get | Rough cost for 1 tag + anchors | Effort |
+|---|---|---|---|
+| Qorvo DWM3001CDK dev kit (DW3110 UWB + nRF52833, has an accelerometer) | DIY; ~$25–32 each at US distributors (RFMW/Octopart $29.50); lead times vary | 3 boards ≈ $90–100 (tag + 2 anchors) | Most: firmware from Qorvo's SDK, we write the ranging + angle math |
+| Makerfabs ESP32 UWB DW3000 | DIY, Arduino-friendly; ~€50–60 each (EU retailer; no current US price found) | 3 boards ≈ $150–180 | Medium: Arduino examples exist |
+| Haorutech ULM3 PDoA anchor + tag (RobotShop) | Ready-made "UWB following": one anchor gives distance ±5 cm and angle over a 120° field | ≈ $250 for the set | Least: read distance + angle over serial |
+Notes: a 120° field means a single PDoA anchor only sees one side of the cart; aim it at his
+side, or add a second. Questions for the morning: wrist or belt; battery life for a
+multi-hour run; where the kill-switch button lives; whether the tag replaces the RFM69
+radios.
 
 ### [jr→mac] 2026-11-21 — Continuity edits: transmitter retired later, runner kill switch, IMU (MacBook only)
 - **DECISIONS.md**, append: `## 2026-11-21 — Forrest Jr: no transmitter in the end; runner kill switch replaces it`
