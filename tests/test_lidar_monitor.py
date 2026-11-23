@@ -40,6 +40,9 @@ class FakeLidar:
                 raise OSError("device disconnected")
             yield s
 
+    def stop(self):
+        self.stopped = True
+
     def close(self):
         self.closed = True
 
@@ -115,3 +118,74 @@ def test_panel_error_and_stopped():
     assert stale["state"] == "stopped" and "10 s ago" in stale["error"] and stale["bins"] is None
     missing = dl.panel(None, NOW)
     assert missing["state"] == "stopped" and "forrest-lidar" in missing["error"]
+
+
+# -- reconnect: "connecting" state, outage length, daily log ------------------
+
+class Wall:
+    """Wall clock that the test moves by hand."""
+    def __init__(self, t=1000.0):
+        self.t = t
+
+    def __call__(self):
+        return self.t
+
+
+def test_each_attempt_writes_connecting_before_the_slow_open(tmp_path):
+    state, seen = tmp_path / "lidar.json", []
+
+    def open_lidar():
+        seen.append(json.loads(state.read_text()))   # what the dashboard sees during open
+        raise OSError("could not open port /dev/ttyUSB0")
+
+    lm.run(state, open_lidar, max_attempts=2, wall=Wall(), sleep=lambda s: None, say=lambda m: None)
+    assert [s["link"] for s in seen] == ["connecting", "connecting"]
+    assert seen[1]["error"].startswith("could not open")     # last error carried along
+    assert json.loads(state.read_text())["link"] == "error"
+
+
+def test_outage_is_timed_and_logged_quietly(tmp_path):
+    state, wall, said = tmp_path / "lidar.json", Wall(), []
+    log = lm.DailyLog(tmp_path / "log", prefix="lidar")
+    attempts = []
+
+    def open_lidar():
+        attempts.append(1)
+        wall.t += 2.0                          # each attempt takes 2 s of wall time
+        if len(attempts) == 1:
+            return FakeLidar([_scan()] * 3, fail_after=2)     # up, then unplugged
+        if len(attempts) < 5:
+            raise OSError("could not open port /dev/ttyUSB0")  # 3 identical failures
+        return FakeLidar([_scan()] * 2)                         # plugged back in
+
+    lm.run(state, open_lidar, max_attempts=5, max_scans=4, clock=Clock(), wall=wall,
+           sleep=lambda s: None, say=said.append, log=log)
+    recs = [json.loads(l) for f in sorted((tmp_path / "log").iterdir()) for l in f.read_text().splitlines()]
+    links = [(r["to"], r["text"][:14]) for r in recs if r["kind"] == "LINK"]
+    # up, disconnected, one "can't open" (not three), up again; no "connecting" lines
+    assert links == [("up", "scanning, mode"), ("error", "device disconn"),
+                     ("error", "could not open"), ("up", "scanning, mode")]
+    back = [r for r in recs if r["kind"] == "LINK"][-1]
+    assert back["down_s"] == 8.0               # failed at t=1002, back at t=1010
+    assert len(said) == 4 and said[-1].endswith("(down 8.0 s)")
+    assert any(r["kind"] == "SAMPLE" for r in recs)
+    assert json.loads(state.read_text())["down_since"] is None
+
+
+def test_fmt_duration():
+    assert dl.fmt_duration(19.4) == "19 s"
+    assert dl.fmt_duration(245) == "4 min 05 s"
+    assert dl.fmt_duration(3725) == "1 h 02 min 05 s"
+    assert dl.fmt_duration(-1) == "0 s"
+
+
+def test_panel_connecting_and_down_time():
+    c = dl.panel(_snap(link="connecting", bins=None, error="could not open port",
+                       updated=NOW - 5, down_since=NOW - 3725), NOW)
+    assert c["state"] == "connecting"          # 5 s quiet is normal while connecting
+    assert "down 1 h 02 min 05 s" in c["error"] and "could not open" in c["error"]
+    assert c["down_s"] == 3725.0
+    e = dl.panel(_snap(link="error", error="timed out", bins=None, down_since=NOW - 19), NOW)
+    assert e["error"] == "LIDAR: timed out · down 19 s"
+    late = dl.panel(_snap(link="connecting", bins=None, updated=NOW - 9), NOW)
+    assert late["state"] == "stopped"          # past CONNECT_STALE_S: really stuck

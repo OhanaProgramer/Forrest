@@ -3,7 +3,8 @@
     /              the dashboard page
     /stream        live annotated view (MJPEG)
     /api/status    hardware status + vision status + Pico panel (JSON)
-    /api/history   the last 30 min of samples, as columns (JSON)
+    /api/history   the last 30 min of samples, as columns (JSON); every sample is
+                   also kept on disk (data/history/history_YYYYMMDD.jsonl)
     /api/lidar     the latest LIDAR rotation for the radar (JSON, small; polled ~4x/s)
 
 Read-only by design: nothing here moves hardware. Bind it to the Tailscale
@@ -40,9 +41,10 @@ def tailscale_ip() -> Optional[str]:
         return None
 
 
-def make_handler(vision):
-    """`vision` is a VisionLoop, or None to run without a camera (the default)."""
-    monitor = Monitor().start()
+def make_handler(vision, history_dir: Optional[str] = None):
+    """`vision` is a VisionLoop, or None to run without a camera (the default).
+    `history_dir`: also append every sample there (one file per day)."""
+    monitor = Monitor(history_dir=history_dir).start()
     pico_state = default_state_path()
     lidar_state = lidar_monitor.default_state_path()
 
@@ -115,7 +117,8 @@ def make_handler(vision):
     return Handler
 
 
-def serve(host: str, port: int, vision=None) -> ThreadingHTTPServer:
-    httpd = ThreadingHTTPServer((host, port), make_handler(vision))
+def serve(host: str, port: int, vision=None,
+          history_dir: Optional[str] = None) -> ThreadingHTTPServer:
+    httpd = ThreadingHTTPServer((host, port), make_handler(vision, history_dir))
     httpd.daemon_threads = True
     return httpd

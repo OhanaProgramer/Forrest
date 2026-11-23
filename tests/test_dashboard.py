@@ -156,3 +156,24 @@ def test_next_deadline_never_bursts_after_stall():
     t = next_deadline(t, now, 2.0)
     assert t == now
     assert next_deadline(t, now, 2.0) == now + 2.0
+
+
+def test_history_is_also_kept_on_disk(tmp_path):
+    m = st.Monitor(history_dir=str(tmp_path))
+    m._read = lambda: {"raw": {**_raw(), "time": 1795460000.0}}
+    m._sample_once(); m._sample_once()
+    files = list(tmp_path.iterdir())
+    assert len(files) == 1 and files[0].name.startswith("history_") and files[0].suffix == ".jsonl"
+    rows = [json.loads(l) for l in files[0].read_text().splitlines()]
+    assert len(rows) == 2 and rows[0]["cpu_temp"] == 58.0 and rows[0]["t"] == 1795460000.0
+    assert len(m.history) == 2                 # the 30-min window still fills as before
+
+
+def test_history_disk_error_does_not_stop_sampling(tmp_path):
+    m = st.Monitor(history_dir=str(tmp_path))
+    m._read = lambda: {"raw": {**_raw(), "time": 1795460000.0}}
+    def boom(rec):
+        raise OSError("No space left on device")
+    m._log.write = boom
+    m._sample_once()
+    assert len(m.history) == 1 and "No space" in m.log_error

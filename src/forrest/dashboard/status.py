@@ -231,12 +231,21 @@ def next_deadline(prev: float, now: float, every: float) -> float:
 class Monitor:
     """Samples hardware every `every` seconds in a background thread and keeps
     `history_s` seconds of history, so trends exist as soon as a page opens.
+    With `history_dir`, every sample is also appended to a daily JSON-lines file
+    there (history_YYYYMMDD.jsonl, ~150 B/row, ~6.5 MB/day), so it outlives
+    the 30-min window and restarts. A write error never stops the sampler.
     Cost on forrest-jr: about half a percent of one core."""
 
     PHYSICAL = ("wlan0", "eth0")
 
-    def __init__(self, disk_path: str = "/", every: float = 2.0, history_s: float = 1800):
+    def __init__(self, disk_path: str = "/", every: float = 2.0, history_s: float = 1800,
+                 history_dir: Optional[str] = None):
         self.disk_path = disk_path
+        self._log = None
+        if history_dir:
+            from forrest.health.pico_monitor import DailyLog
+            self._log = DailyLog(Path(history_dir), prefix="history")
+        self.log_error: Optional[str] = None
         self.every = every
         self.history: deque = deque(maxlen=int(history_s / every))
         self._latest: Optional[dict] = None
@@ -269,9 +278,16 @@ class Monitor:
 
     def _sample_once(self) -> dict:
         r = self._read()
+        row = sample(r["raw"])
         with self._lock:
             self._latest = r
-            self.history.append(sample(r["raw"]))
+            self.history.append(row)
+        if self._log is not None:
+            try:
+                self._log.write(row)
+                self.log_error = None
+            except OSError as e:               # disk full / permissions: keep sampling
+                self.log_error = str(e)
         return r
 
     def read(self) -> dict:

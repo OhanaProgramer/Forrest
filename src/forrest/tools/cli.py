@@ -73,7 +73,10 @@ def cmd_lidar_monitor(args) -> int:
     from forrest.health import lidar_monitor
     state = Path(args.state) if args.state else lidar_monitor.default_state_path()
     print(f"LIDAR monitor on {args.port}: state -> {state} (Ctrl-C to stop)")
-    lidar_monitor.run(state, lambda: _open_lidar(args.port))
+    from forrest.health.pico_monitor import DailyLog
+    print(f"  log -> {args.log_dir}/lidar_YYYYMMDD.jsonl")
+    lidar_monitor.run(state, lambda: _open_lidar(args.port),
+                      log=DailyLog(Path(args.log_dir), prefix="lidar"))
     return 0
 
 
@@ -243,7 +246,9 @@ def cmd_dash(args) -> int:
         from forrest.drivers.camera_hailo import VisionLoop
         vision = VisionLoop(threshold=args.threshold)
         vision.start()
-    httpd = serve(host, args.port, vision)
+    httpd = serve(host, args.port, vision, history_dir=args.history_dir or None)
+    if args.history_dir:
+        print(f"history log: {args.history_dir}/history_YYYYMMDD.jsonl (every 2 s)")
     print(f"dashboard: http://{host}:{args.port}/   (Ctrl-C to stop)")
     try:
         httpd.serve_forever()
@@ -363,6 +368,7 @@ def main(argv=None) -> int:
     m = lsub.add_parser("monitor", help="scan forever; write the latest rotation for the dashboard radar")
     m.add_argument("--port", default=DEFAULT_PORT)
     m.add_argument("--state", help="state file (default: $XDG_RUNTIME_DIR/forrest/lidar.json)")
+    m.add_argument("--log-dir", default="data/lidar", help="daily log of link changes + samples")
     m.set_defaults(func=cmd_lidar_monitor)
 
     r = lsub.add_parser("record", help="save scans to a .jsonl file")
@@ -397,6 +403,8 @@ def main(argv=None) -> int:
     d.add_argument("--threshold", type=float, default=0.5, help="minimum detection score")
     d.add_argument("--camera", action="store_true",
                    help="also run camera + Hailo detection (holds the camera)")
+    d.add_argument("--history-dir", default="data/history",
+                   help="keep every 2 s sample here, one file per day ('' = memory only)")
     d.set_defaults(func=cmd_dash)
 
     pico = sub.add_parser("pico", help="Pico 2 drive controller tools")

@@ -118,15 +118,17 @@ def write_state(path: Path, snap: dict) -> None:
 
 
 class DailyLog:
-    """Append-only JSON lines, one file per local day: data/pico/pico_YYYYMMDD.jsonl"""
+    """Append-only JSON lines, one file per local day: <log_dir>/<prefix>_YYYYMMDD.jsonl
+    (data/pico/pico_*, data/lidar/lidar_*, data/history/history_*)."""
 
-    def __init__(self, log_dir: Path):
+    def __init__(self, log_dir: Path, prefix: str = "pico"):
         self.dir = Path(log_dir)
+        self.prefix = prefix
         self.dir.mkdir(parents=True, exist_ok=True)
 
     def write(self, rec: dict) -> None:
         day = time.strftime("%Y%m%d", time.localtime(rec["t"]))
-        with (self.dir / f"pico_{day}.jsonl").open("a") as f:
+        with (self.dir / f"{self.prefix}_{day}.jsonl").open("a") as f:
             f.write(json.dumps(rec) + "\n")
 
 
