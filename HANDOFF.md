@@ -31,7 +31,8 @@ finished items are deleted from here.
 - **System journal now persistent** (Jacque ran it, 11:37): RPi OS forces `Storage=volatile`; overridden by
   `/etc/systemd/journald.conf.d/90-forrest.conf` (copy + install steps in `pi/journald/`): SSD, 3 months, 2 GB cap.
   Services now set `PYTHONUNBUFFERED=1`, so their own prints reach the journal (before: only systemd's lines).
-- Next: dashboard view of the long history (pick a day / range); break-it: kill camera, Wi-Fi drop.
+- Next: dashboard view of the long history (pick a day / range); break-it: Wi-Fi drop.
+  Deferred (Jacque, 11-23): camera break-it test, no easy way to disconnect the ribbon.
 
 ## Resume here (end of day 2026-11-22, forrest-jr)
 - **State overnight:** Jr left running headless. `forrest-lidar` stopped after the soak to save the
