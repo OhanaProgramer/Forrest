@@ -29,6 +29,10 @@ finished items are deleted from here.
   for it) → watch the radar go live. Then: the drive Pico back on USB + P3 soak; trim the
   checklist (kill-switch items out); TQi receiver test (no pulses or neutral with TX off?);
   Wi-Fi drop with the camera running (still untested).
+- **USB layout final (Jacque, 2026-11-22):** drive Pico 2 `1c4e1cea890aaffb` on xhci-hcd.0 port 2 (ttyACM0);
+  sensor Pico W `e6616408430b7439` on xhci-hcd.1 port 2 (ttyACM1); RPLIDAR C1 (CP2102N) on xhci-hcd.1
+  port 1 (ttyUSB0, live: 10 Hz, ~470 pts); SSD on USB 3. Picos are chosen by serial (BOARDS), so ACM
+  order doesn't matter. forrest-pico monitors the drive Pico (failsafe, neutral, 6.5 ms rtt). B1 LIDAR step done.
 - Still open: confirm the Claude token was rotated; `~/.bashrc.bak-20261106090231` remains
   (check it for the old token, then delete).
 - Mac to-do: pull; apply the queued Continuity edits (11-21, 11-10, 11-08, 11-04); add to
