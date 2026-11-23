@@ -8,6 +8,8 @@ Description=Forrest LIDAR monitor (forrest lidar monitor, feeds the radar)
 
 [Service]
 WorkingDirectory=%h/Projects/02_builds/forrest
+# print straight to the journal (Python buffers stdout when it is not a terminal)
+Environment=PYTHONUNBUFFERED=1
 ExecStart=%h/Projects/02_builds/forrest/.venv/bin/forrest lidar monitor
 Restart=always
 RestartSec=5

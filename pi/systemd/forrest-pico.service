@@ -8,6 +8,8 @@ Description=Forrest Pico monitor (forrest pico monitor, read-only)
 
 [Service]
 WorkingDirectory=%h/Projects/02_builds/forrest
+# print straight to the journal (Python buffers stdout when it is not a terminal)
+Environment=PYTHONUNBUFFERED=1
 ExecStart=%h/Projects/02_builds/forrest/.venv/bin/forrest pico monitor
 Restart=always
 RestartSec=5

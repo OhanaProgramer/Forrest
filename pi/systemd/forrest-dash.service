@@ -10,6 +10,8 @@ After=network-online.target
 WorkingDirectory=%h/Projects/02_builds/forrest
 # Pin the Tailscale IP: without it, a boot before Tailscale is up would fall back to 127.0.0.1.
 # Until tailscale0 has the address the bind fails and systemd retries every 5 s.
+# print straight to the journal (Python buffers stdout when it is not a terminal)
+Environment=PYTHONUNBUFFERED=1
 ExecStart=%h/Projects/02_builds/forrest/.venv/bin/forrest dash --host 100.123.84.14 --port 8090 --camera
 Restart=always
 RestartSec=5
