@@ -32,6 +32,18 @@ finished items are deleted from here.
   `/etc/systemd/journald.conf.d/90-forrest.conf` (copy + install steps in `pi/journald/`): SSD, 3 months, 2 GB cap.
   Services now set `PYTHONUNBUFFERED=1`, so their own prints reach the journal (before: only systemd's lines).
 - Next: dashboard view of the long history (pick a day / range); break-it: Wi-Fi drop.
+- **BME688 first light (sensor Pico W, I2C0 GP4/GP5, 3V3, 0x77, chip 0x61 variant 0x01):** own driver
+  `firmware/pico/sensors/bme688.py` (datasheet float maths, trigger-then-collect, never blocks), 8 host
+  tests incl. one real reading. Live: 23 C, 40 %RH, 831.4 hPa (~1600 m elevation), breath raised RH.
+  New sensor: gas pinned at ADC full scale (5684 ohm every read) until the heater ran hotter/longer, then
+  live and rising 9 -> 16 kohm in 60 s; flagged as `gas_low`. Needs ~24 h burn-in before gas is meaningful.
+  Not yet: sensors main.py protocol (still the blink), Pi-side monitor, sidebar rows.
+- **USB controller crash (11:59):** plugging the Pico W in while the LIDAR runs broke the LIDAR stream (2 of 2)
+  and once killed xhci-hcd.1 ("HC died"; port power off, LIDAR LED out). Recovered with
+  `echo xhci-hcd.1 | sudo tee /sys/bus/platform/drivers/xhci-hcd/{unbind,bind}`; no damage, LIDAR back.
+  Pico W alone: clean; LIDAR plugged in next to a running Pico W: clean. Rule for now: plug the Pico W first
+  (or stop forrest-lidar). Fix later: powered USB hub. (Moving ports won't help: hcd.0 = SSD + drive Pico.)
+  Break-it tests otherwise deferred until more assembly (Jacque, 11-23).
   Deferred (Jacque, 11-23): camera break-it test, no easy way to disconnect the ribbon.
 
 ## Resume here (end of day 2026-11-22, forrest-jr)

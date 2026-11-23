@@ -17,6 +17,6 @@ CONNECT=(connect "$PORT")
 
 # modules first, main.py last, so the board never boots a main.py whose imports are missing
 if [[ $BOARD == drive ]]; then FILES=(comm.py heartbeat.py protocol.py main.py)
-else FILES=(main.py); fi
+else FILES=(bme688.py main.py); fi
 "$MP" "${CONNECT[@]}" cp "${FILES[@]}" : + exec "import os; print('on board:', os.listdir())" + reset
 echo "deployed to $BOARD: ${FILES[*]}"
