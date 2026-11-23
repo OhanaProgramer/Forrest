@@ -15,28 +15,44 @@ finished items are deleted from here.
 5. Who edits code: either machine may change this repo. Hardware drivers and
    bench runs are done on forrest-jr; say in the item which machine owns a change.
 
-## Resume here (2026-11-22, forrest-jr)
-- **Jr is headless now** (Jacque ran `raspi-config nonint do_boot_behaviour B1`): boots to
-  `multi-user.target`, no desktop, no autologin. The user services still start at boot
-  (linger on). Git uses `~/.ssh/forrest_deploy` (no passphrase, no keyring needed). After the
-  reboot at 12:34: forrest-dash/pico/lidar all came up active, camera + Hailo at 30.0 fps,
-  `/stream` serving, HTTP 200, 859 MB RAM used (was 1,743 MB with the desktop), 47 C, throttled=0x0.
-  This also completes the **reboot test with the camera at boot** (3432367). Undo: `do_boot_behaviour B4`.
-- Done today (commits f29f579..3432367): LIDAR dashboard view + `forrest-lidar` monitor service;
-  monotonic-clock fixes for the history sampler and camera fps; forrest-dash runs `--camera` at boot.
-  SSH from the MacBook, the dashboard and the camera stream were all tested by Jacque. `git stash drop` done.
-- **Next: bench B1.** Jacque is plugging in the RPLIDAR C1 (`/dev/ttyUSB0`; the monitor is waiting
-  for it) → watch the radar go live. Then: the drive Pico back on USB + P3 soak; trim the
-  checklist (kill-switch items out); TQi receiver test (no pulses or neutral with TX off?);
-  Wi-Fi drop with the camera running (still untested).
-- **USB layout final (Jacque, 2026-11-22):** drive Pico 2 `1c4e1cea890aaffb` on xhci-hcd.0 port 2 (ttyACM0);
+## Resume here (end of day 2026-11-22, forrest-jr)
+- **State overnight:** Jr left running headless. `forrest-lidar` stopped after the soak to save the
+  C1 motor (it spins whenever the service runs): `systemctl --user start forrest-lidar` to bring it back.
+  forrest-dash (camera + Hailo) and forrest-pico still running.
+- **Integration checklist** https://claude.ai/artifact/EtfnFqFpPchsKh8wkbou4Q: 18 / 63 ticked, each with a note.
+  Today: picos, lidar, portmap, power, drivecheck, lidarsvc, camsvc, reboot, b1, radar, dashpicos.
+  (The kill-switch trim is already done: those items are in its Parked for Sr section.)
+- **B1 passed:** RPLIDAR C1 live 360 deg on wall power (10 Hz, ~470 pts); Jacque walked around it and showed
+  up as a moving blob on the radar. Picos group shows both boards in the browser.
+- **USB layout final (Jacque):** drive Pico 2 `1c4e1cea890aaffb` on xhci-hcd.0 port 2 (ttyACM0);
   sensor Pico W `e6616408430b7439` on xhci-hcd.1 port 2 (ttyACM1); RPLIDAR C1 (CP2102N) on xhci-hcd.1
-  port 1 (ttyUSB0, live: 10 Hz, ~470 pts); SSD on USB 3. Picos are chosen by serial (BOARDS), so ACM
-  order doesn't matter. forrest-pico monitors the drive Pico (failsafe, neutral, 6.5 ms rtt). B1 LIDAR step done.
-- Still open: confirm the Claude token was rotated; `~/.bashrc.bak-20261106090231` remains
-  (check it for the old token, then delete).
-- Mac to-do: pull; apply the queued Continuity edits (11-21, 11-10, 11-08, 11-04); add to
-  USER.md/local_IT: forrest-jr is headless (console boot) from 2026-11-22.
+  port 1 (ttyUSB0); SSD on USB 3. Picos are chosen by serial (BOARDS), so ACM order doesn't matter.
+- **Sensor Pico W** (6df9820): LED-blink placeholder `firmware/pico/sensors/main.py` (100 ms flash / s),
+  prints `READY sensors (led-blink placeholder)`. `deploy.sh sensors|drive` (default drive), by serial.
+  Board was empty before. Next: READY/readings protocol with "no sensor" replies (checklist sensorfw).
+- **All-running soak** (camera + Hailo + LIDAR + Pico monitor, data/soak/soak_20261122_1742.csv, git-ignored):
+  **P3 passed**, 30.1 min / 180 samples: 42.2-46.1 C (settled about 44-45 C), 5V 5.05-5.18 V, throttled=0x0 throughout,
+  load 0.4-1.2, camera 28.9-30.3 fps (avg 30.0), LIDAR 9.9-10.2 Hz, drive Pico link up throughout, no new failsafe trips.
+  Logger bug: `grep '[0-9.]+V'` also matched "5V" in EXT5V_V, so each sample spans two CSV lines; fix before reuse.
+- **Hailo driver warning:** at camera start, kernel 6.18 logs `WARNING ... find_vma` from
+  `hailo_vdma_buffer_map [hailo_pci]` (mmap lock not held). Detection fine at 30 fps; watch for a hailo-dkms update.
+- Drive Pico: ESC and servo **not wired yet**, so drive-side tests wait for the RC car.
+- **Next (no parts needed):** break-it tests (unplug drive Pico, unplug LIDAR, kill camera, Wi-Fi drop with
+  the camera running); drawer/lights click test; detections to a JSON log; green cast; sensor Pico protocol.
+- **Still open:** rotate the Claude token (`claude setup-token` started, then stopped for the night), revoke
+  the old one, swap it in ~/.bashrc and ~/.zshrc, then `rm ~/.bashrc.bak-20261106090231` (it has the old token).
+- Idea for PARKING_LOT: remote wake for a shut-down Pi via the Pico W "pressing" the Pi 5 power-button
+  pads through a transistor on a network message (the Pi 5 has no suspend or Wake-on-LAN). Simpler: smart plug.
+- Mac to-do: pull; apply the queued Continuity edits (11-22 below, 11-21, 11-10, 11-08, 11-04); add to
+  USER.md/local_IT: forrest-jr is headless (console boot) from 2026-11-22; SYSTEMS.md: B1 passed 2026-11-22,
+  USB port map; PARKING_LOT: the remote-wake idea.
+
+## Earlier on 2026-11-22 (forrest-jr)
+- Headless since 12:34 (`raspi-config nonint do_boot_behaviour B1`; undo B4): boots to multi-user.target,
+  user services start via linger, 859 MB RAM used (was 1,743 MB with the desktop). Reboot test with the
+  camera at boot passed (3432367). Git uses `~/.ssh/forrest_deploy`.
+- Commits f29f579..3432367: LIDAR dashboard view + `forrest-lidar` service; monotonic-clock fixes;
+  forrest-dash runs `--camera` at boot. `git stash drop` done.
 
 ## Previous (end of day 2026-11-21, forrest-jr)
 - Done today: fixed ~/.bashrc (broken CLAUDE_CODE_OAUTH_TOKEN lines; backup
