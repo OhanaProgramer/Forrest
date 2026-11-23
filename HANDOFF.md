@@ -15,6 +15,23 @@ finished items are deleted from here.
 5. Who edits code: either machine may change this repo. Hardware drivers and
    bench runs are done on forrest-jr; say in the item which machine owns a change.
 
+## 2026-11-23 (forrest-jr)
+- Tailscale drop this morning was on the Mac side; the Pi was fine (Mac back, direct 192.168.0.173).
+- **Break-it: USB unplug with services running PASSED.** No service restarted (NRestarts 0, boot PIDs).
+  LIDAR: error within 0.5 s, back 4 s after replug (out ~19 s). Drive Pico: `link lost` at once,
+  back 2 s after replug, same ttyACM1 (out ~21 s). Sensor Pico W: tile not-connected at once, back on replug.
+  Found: **replugging the sensor Pico W broke the LIDAR stream** (`timed out: wanted 5 bytes, got 1`,
+  self-recovered in 5 s). Both are on xhci-hcd.1; likely a power/bus disturbance. To confirm (replug the
+  Pico W twice, watch the LIDAR); possible fix: move the sensor Pico to xhci-hcd.0 next to the drive Pico.
+  ACM numbers now: sensor ACM0, drive ACM1 (picked by serial, so fine).
+- aa1712f: history kept on disk (`data/history/history_YYYYMMDD.jsonl`, every 2 s, ~6.5 MB/day, no pruning
+  yet); LIDAR link log (`data/lidar/`, link changes with `down_s` + a sample every 10 s); "connecting"
+  state fixes the false "LIDAR monitor stopped" during reconnects; outage shown as h / min / s; LIDAR STOP
+  on open (a restart used to fail once with "bad response descriptor"). 95 tests pass. Services restarted.
+- Note: the system journal isn't persistent (no /var/log/journal), so service logs vanish on reboot.
+  Fix needs sudo: `sudo mkdir -p /var/log/journal && sudo systemctl restart systemd-journald`.
+- Next: dashboard view of the long history (pick a day / range); break-it: kill camera, Wi-Fi drop.
+
 ## Resume here (end of day 2026-11-22, forrest-jr)
 - **State overnight:** Jr left running headless. `forrest-lidar` stopped after the soak to save the
   C1 motor (it spins whenever the service runs): `systemctl --user start forrest-lidar` to bring it back.
