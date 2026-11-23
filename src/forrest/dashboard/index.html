@@ -200,6 +200,13 @@
   .dh h2 { margin:0; font-size:15px; font-weight:600; }
   .dh button { appearance:none; border:0; font:inherit; font-size:13px; color:var(--ink); cursor:pointer;
                background:var(--surface); box-shadow:0 0 0 1px var(--ring); border-radius:8px; padding:6px 10px; }
+  /* LIDAR on/off: the dashboard's one switch (starts / stops the forrest-lidar service) */
+  .pwr { margin-left:auto; appearance:none; border:0; font:inherit; font-size:12.5px; font-weight:600; cursor:pointer;
+         color:var(--ink); background:var(--surface); box-shadow:0 0 0 1px var(--ring); border-radius:999px;
+         padding:4px 12px 4px 10px; display:inline-flex; align-items:center; gap:7px; }
+  .pwr::before { content:""; width:9px; height:9px; border-radius:50%; background:var(--na); }
+  .pwr[aria-pressed="true"]::before { background:var(--good); }
+  .pwr:disabled { opacity:.6; cursor:progress; }
   @media (max-width:860px) {
     .app { grid-template-columns:1fr; }
     .side { position:static; flex-direction:row; flex-wrap:wrap; gap:4px 16px; }
@@ -235,7 +242,8 @@
 
 <main class="views">
   <section class="view" id="radar-view">
-    <div class="vh"><h2>Radar</h2><span id="radar-sub">LIDAR, top-down · rings every 1 m</span></div>
+    <div class="vh"><h2>Radar</h2><span id="radar-sub">LIDAR, top-down · rings every 1 m</span>
+      <button type="button" class="pwr" id="lidar-power" aria-pressed="false" title="Start or stop the LIDAR (forrest-lidar service)">LIDAR …</button></div>
     <div class="vbody">
       <svg id="radar" viewBox="-110 -110 220 220" role="img" aria-label="LIDAR radar view"></svg>
       <div class="vmsg" id="radar-msg"></div>
@@ -885,6 +893,30 @@ function renderRadar(l) {
     (ni >= 0 ? ` · nearest ${l.bins[ni].toFixed(2)} m at ${Math.round((ni + 0.5) * step)}°` : "") + " · rings 1 m";
 }
 
+// LIDAR on/off. The button shows the service state; pressing it asks the Pi to
+// start or stop forrest-lidar and waits for the answer (stop takes ~1 s, start ~3 s).
+let lidarBusy = false;
+function renderLidarPower(service) {
+  const b = $("lidar-power");
+  if (lidarBusy) return;
+  const on = service === "active";
+  b.setAttribute("aria-pressed", on ? "true" : "false");
+  b.textContent = on ? "LIDAR on" : service === "inactive" ? "LIDAR off" : `LIDAR ${service || "?"}`;
+  b.title = on ? "LIDAR running. Press to stop it (motor stops)." : "LIDAR stopped. Press to start it.";
+}
+$("lidar-power").addEventListener("click", async () => {
+  const b = $("lidar-power");
+  const turnOn = b.getAttribute("aria-pressed") !== "true";
+  lidarBusy = true; b.disabled = true; b.textContent = turnOn ? "starting…" : "stopping…";
+  try {
+    const r = await fetch("/api/lidar/power", { method: "POST", headers: { "Content-Type": "application/json" },
+                                                body: JSON.stringify({ on: turnOn }) });
+    const j = await r.json();
+    lidarBusy = false; renderLidarPower(j.service);
+  } catch (e) { lidarBusy = false; b.textContent = "LIDAR ?"; }
+  finally { b.disabled = false; }
+});
+
 // Fast radar poll (~4/s), separate from the 2 s status tick. Skips while the tab
 // is hidden or the Pi is offline, and never overlaps itself.
 let radarBusy = false;
@@ -924,6 +956,7 @@ async function tick() {
     renderPicoEvents(s.pico);
     renderSidebar(s.sidebar);
     if (!s.lidar || !s.lidar.running) renderRadar(s.lidar);   // live points come from radarTick
+    renderLidarPower(s.lidar && s.lidar.service);
     renderCamera(s.vision);
     if (!$("history-wrap").hidden) drawCharts();
     const L = limits;

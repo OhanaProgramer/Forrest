@@ -6,9 +6,14 @@
     /api/history   the last 30 min of samples, as columns (JSON); every sample is
                    also kept on disk (data/history/history_YYYYMMDD.jsonl)
     /api/lidar     the latest LIDAR rotation for the radar (JSON, small; polled ~4x/s)
+    POST /api/lidar/power  {"on": true|false}: start / stop the forrest-lidar service
 
-Read-only by design: nothing here moves hardware. Bind it to the Tailscale
-address so it is reachable from the tailnet only.
+Read-only except for one switch (Jacque, 2026-11-23): the LIDAR on/off, which
+starts or stops the `forrest-lidar` user service (stopping it sends the LIDAR
+STOP, so the motor winds down). It's a runtime switch: the service still
+starts at boot. Nothing here drives the car. The POST must be JSON, so a
+plain cross-site form can't press it. Bind to the Tailscale address so it is
+reachable from the tailnet only.
 """
 
 from __future__ import annotations
@@ -23,9 +28,26 @@ import time
 
 from forrest.dashboard import lidar as lidar_panel
 from forrest.dashboard import pico as pico_panel
+from forrest.dashboard import sensors as sensors_panel
 from forrest.dashboard.sidebar import sidebar
 from forrest.dashboard.status import GROUPS, LIMITS, Monitor
-from forrest.health import lidar_monitor
+from forrest.health import lidar_monitor, sensor_monitor
+
+LIDAR_UNIT = "forrest-lidar"
+
+
+def lidar_service(action: str = "is-active") -> str:
+    """`systemctl --user <action> forrest-lidar`; -> the service state afterwards
+    ("active", "inactive", "failed", ... or "unknown")."""
+    try:
+        if action != "is-active":
+            subprocess.run(["systemctl", "--user", action, LIDAR_UNIT], timeout=15,
+                           capture_output=True, check=False)
+        out = subprocess.run(["systemctl", "--user", "is-active", LIDAR_UNIT], timeout=5,
+                             capture_output=True, text=True, check=False).stdout.strip()
+        return out or "unknown"
+    except (FileNotFoundError, subprocess.SubprocessError):
+        return "unknown"
 from forrest.health.pico_monitor import default_state_path
 
 PAGE = Path(__file__).with_name("index.html")
@@ -48,8 +70,20 @@ def make_handler(vision, history_dir: Optional[str] = None):
     pico_state = default_state_path()
     lidar_state = lidar_monitor.default_state_path()
 
+    sensors_state = sensor_monitor.default_state_path()
+    svc = {"state": lidar_service(), "t": time.monotonic()}
+
+    def lidar_svc() -> str:
+        if time.monotonic() - svc["t"] > 2.0:          # cache: the page asks often
+            svc.update(state=lidar_service(), t=time.monotonic())
+        return svc["state"]
+
     def lidar_now() -> dict:
-        return lidar_panel.panel(pico_panel.read_state(lidar_state), time.time())
+        p = lidar_panel.panel(pico_panel.read_state(lidar_state), time.time())
+        p["service"] = lidar_svc()
+        if p["service"] == "inactive":   # wins over a still-fresh scan file in the seconds after a stop
+            p.update(running=False, state="off", bins=None, error="LIDAR off (switched off) · motor stopped")
+        return p
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, fmt, *args):  # keep the terminal quiet
@@ -71,9 +105,13 @@ def make_handler(vision, history_dir: Optional[str] = None):
                 # The Pico panel reads the monitor's state file; the dashboard never opens the port.
                 pico = pico_panel.panel(pico_panel.read_state(pico_state), time.time(),
                                        pico_panel.usb_ports())
+                sens = sensors_panel.panel(pico_panel.read_state(sensors_state), time.time())
+                if any(t["key"] == "pico_sensors" for t in pico["tiles"]):   # board on USB: say what it reads
+                    pico["tiles"] = [sens["tile"] if t["key"] == "pico_sensors" else t for t in pico["tiles"]]
                 body = {"hardware": monitor.read(), "limits": LIMITS, "pico": pico,
-                        # sensors not fitted yet: env/gps/battery pass None until their drivers exist
-                        "sidebar": sidebar(pico=pico),
+                        # gps / battery pass None until their drivers exist
+                        "sidebar": sidebar(pico=pico, env=sens["env"], env_why=sens["env_why"],
+                                           motion=sens["motion"], motion_why=sens["motion_why"]),
                         "lidar": {k: v for k, v in lidar_now().items() if k != "bins"},
                         "groups": [{"key": k, "title": t, "question": q} for k, t, q in GROUPS],
                         "vision": vision.status() if vision else {"running": False,
@@ -90,6 +128,26 @@ def make_handler(vision, history_dir: Optional[str] = None):
                 self._stream()
             else:
                 self._send(404, b"not found", "text/plain")
+
+        def do_POST(self):
+            path = self.path.split("?", 1)[0]
+            if path != "/api/lidar/power":
+                self._send(404, b"not found", "text/plain")
+                return
+            if not (self.headers.get("Content-Type") or "").startswith("application/json"):
+                self._send(415, b"JSON only", "text/plain")
+                return
+            try:
+                n = int(self.headers.get("Content-Length") or 0)
+                on = json.loads(self.rfile.read(min(n, 1024)) or b"{}")["on"]
+                if not isinstance(on, bool):
+                    raise ValueError
+            except (ValueError, KeyError, TypeError):
+                self._send(400, b'want {"on": true|false}', "text/plain")
+                return
+            state = lidar_service("start" if on else "stop")
+            svc.update(state=state, t=time.monotonic())
+            self._send(200, json.dumps({"on": on, "service": state}).encode(), "application/json")
 
         def _stream(self):
             if vision is None:

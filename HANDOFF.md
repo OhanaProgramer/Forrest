@@ -15,6 +15,30 @@ finished items are deleted from here.
 5. Who edits code: either machine may change this repo. Hardware drivers and
    bench runs are done on forrest-jr; say in the item which machine owns a change.
 
+## Resume here (2026-11-23 ~12:50, forrest-jr): sensor burn-in running, leave Jr alone ~24 h
+- **Running:** forrest-dash (camera + Hailo), forrest-pico, **forrest-sensors (new)**. **LIDAR switched off**
+  (dashboard switch; it still starts at boot, so a reboot turns it back on).
+- **Sensor Pico W live:** BME688 0x77 + LIS3DH 0x18 daisy-chained on STEMMA QT (I2C0 GP4/GP5, 3V3).
+  Firmware `firmware/pico/sensors/main.py` pushes JSON lines: ENV every 5 s (heater ~3 % duty), ACC summary
+  every 1 s from 50 Hz sampling, EVT FLIP/UPRIGHT/IMPACT at once; missing sensor -> "err" + retry every 10 s.
+  LIS3DH at +-8 g (impact must read > 2 g). Flip = Z < -0.5 g held 0.5 s; impact >= 2.5 g (bench guesses).
+- **Pi side:** `forrest sensors monitor` (service forrest-sensors) -> state for the dashboard + daily log
+  `data/sensors/sensors_YYYYMMDD.jsonl` (every ENV, ACC every 10 s, events, errors). Sidebar: Environment
+  (temp, humidity, pressure, gas) + Motion (orientation, tilt, last flip/impact). Sensor Pico tile shows "up".
+  `deploy.sh sensors` pauses forrest-sensors for the copy.
+- **Burn-in:** BME688 gas started at the bottom of its range, 5.7 kOhm (pinned), now ~19 kOhm and climbing. Check the log
+  tomorrow for where it levels off; gas means little before that.
+- **Power (inline USB meter, Jacque):** Pico W 31 mA; + BME688 31 mA; + LIS3DH 33 mA; BME688 heater
+  back-to-back ~40 mA (heater ~11 mA). Back-to-back reads self-heat the BME688 +5 C (hence 5 s period).
+  Later: FNIRSI 2C53T scope + shunt to catch the heater pulses and the Pico W plug-in surge.
+- **Dashboard now has one switch:** LIDAR on/off (POST /api/lidar/power, JSON only) starts/stops forrest-lidar.
+  The dashboard was read-only by design until now (Jacque asked for it 11-23). Nothing that drives the car.
+- Board LEDs: the BME688/LIS3DH power LEDs aren't software-switchable; Adafruit boards have a cuttable LED
+  jumper on the back (check first). About 1 mA each, so it's only about light.
+- Mac to-do (Continuity): SYSTEMS.md: sensors B-step done (BME688 + LIS3DH on the Pico W, numbers above);
+  DECISIONS: dashboard gets a LIDAR on/off switch (first control on the page); PARKING_LOT: powered USB hub
+  for the Pico W / LIDAR controller crash.
+
 ## 2026-11-23 (forrest-jr)
 - Tailscale drop this morning was on the Mac side; the Pi was fine (Mac back, direct 192.168.0.173).
 - **Break-it: USB unplug with services running PASSED.** No service restarted (NRestarts 0, boot PIDs).

@@ -13,7 +13,7 @@ PICO_UP = {"tiles": [
 
 def test_no_sensors_are_placeholders():
     s = sidebar()
-    assert [x["key"] for x in s] == ["env", "gps", "robot"]
+    assert [x["key"] for x in s] == ["env", "motion", "gps", "robot"]
     env = rows(s, "env")
     assert env["Air temp"]["level"] == "na" and env["Air temp"]["detail"] == "no sensor yet"
     assert rows(s, "gps")["Position"]["detail"] == "no GPS yet"

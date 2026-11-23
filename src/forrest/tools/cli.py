@@ -351,6 +351,18 @@ def cmd_pico_monitor(args) -> int:
     return 0
 
 
+def cmd_sensors_monitor(args) -> int:
+    from forrest.health import sensor_monitor as sm
+    from forrest.health.pico_monitor import DailyLog
+
+    state = Path(args.state) if args.state else sm.default_state_path()
+    print(f"Sensor monitor (sensor Pico W: BME688 + LIS3DH). State: {state}  "
+          f"Log: {args.log_dir}/sensors_YYYYMMDD.jsonl. Ctrl-C to stop.", flush=True)
+    sm.run(state, DailyLog(Path(args.log_dir), prefix="sensors"),
+           say=lambda line: print(line, flush=True))
+    return 0
+
+
 # ---------------------------------------------------------------------------
 
 def main(argv=None) -> int:
@@ -422,6 +434,13 @@ def main(argv=None) -> int:
     pm.add_argument("--state", help="state file (default: $XDG_RUNTIME_DIR/forrest/pico.json)")
     pm.add_argument("--log-dir", default="data/pico")
     pm.set_defaults(func=cmd_pico_monitor)
+
+    sens = sub.add_parser("sensors", help="sensor Pico W tools (BME688 air, LIS3DH motion)")
+    ssub = sens.add_subparsers(dest="sensors_cmd", required=True)
+    sm_ = ssub.add_parser("monitor", help="listen to the sensor Pico; state for the dashboard + a daily log")
+    sm_.add_argument("--state", help="state file (default: $XDG_RUNTIME_DIR/forrest/sensors.json)")
+    sm_.add_argument("--log-dir", default="data/sensors")
+    sm_.set_defaults(func=cmd_sensors_monitor)
 
     args = p.parse_args(argv)
     try:

@@ -2,6 +2,7 @@
 
 import json
 import threading
+import urllib.error
 import urllib.request
 
 from forrest.dashboard import status as st
@@ -177,3 +178,39 @@ def test_history_disk_error_does_not_stop_sampling(tmp_path):
     m._log.write = boom
     m._sample_once()
     assert len(m.history) == 1 and "No space" in m.log_error
+
+
+def test_lidar_power_switch(monkeypatch):
+    from forrest.dashboard import server as srv
+    calls = []
+
+    def fake_service(action="is-active"):
+        calls.append(action)
+        return {"start": "active", "stop": "inactive"}.get(action, "active")
+
+    monkeypatch.setattr(srv, "lidar_service", fake_service)
+    httpd = srv.serve("127.0.0.1", 0, vision=None)
+    port = httpd.server_address[1]
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    url = f"http://127.0.0.1:{port}/api/lidar/power"
+
+    def post(body, ctype="application/json"):
+        req = urllib.request.Request(url, data=body, method="POST", headers={"Content-Type": ctype})
+        try:
+            with urllib.request.urlopen(req, timeout=5) as r:
+                return r.status, json.loads(r.read())
+        except urllib.error.HTTPError as e:
+            return e.code, None
+
+    try:
+        assert post(b"on=false", "application/x-www-form-urlencoded")[0] == 415   # no form posts
+        assert post(b'{"on": "yes"}')[0] == 400
+        assert post(b'{"on": false}') == (200, {"on": False, "service": "inactive"})
+        assert "stop" in calls
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/lidar", timeout=5) as r:
+            lid = json.loads(r.read())
+        assert lid["service"] == "inactive" and "switched off" in lid["error"]
+        assert lid["state"] == "off" and lid["running"] is False and lid["bins"] is None
+        assert post(b'{"on": true}') == (200, {"on": True, "service": "active"})
+    finally:
+        httpd.shutdown()

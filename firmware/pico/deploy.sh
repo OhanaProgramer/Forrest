@@ -17,6 +17,12 @@ CONNECT=(connect "$PORT")
 
 # modules first, main.py last, so the board never boots a main.py whose imports are missing
 if [[ $BOARD == drive ]]; then FILES=(comm.py heartbeat.py protocol.py main.py)
-else FILES=(bme688.py main.py); fi
+else FILES=(bme688.py lis3dh.py main.py); fi
+# The sensor monitor holds the sensor Pico's port: pause it for the copy, then resume.
+RESUME=""
+if [[ $BOARD == sensors ]] && systemctl --user is-active --quiet forrest-sensors 2>/dev/null; then
+  systemctl --user stop forrest-sensors; RESUME=forrest-sensors
+fi
+trap '[[ -n $RESUME ]] && systemctl --user start $RESUME' EXIT
 "$MP" "${CONNECT[@]}" cp "${FILES[@]}" : + exec "import os; print('on board:', os.listdir())" + reset
-echo "deployed to $BOARD: ${FILES[*]}"
+echo "deployed to $BOARD: ${FILES[*]}${RESUME:+ (paused and resumed $RESUME)}"

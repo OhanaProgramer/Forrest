@@ -4,8 +4,9 @@ Pure: takes what the sensors have reported (None = no sensor yet) and returns
 sections of rows for the page. Each row: label, value, detail, level
 (ok / warn / bad / na), the same levels as the tiles.
 
-Sensors as of 2026-11-08: none fitted. Planned (shopping list in HANDOFF.md):
-  * air temperature / humidity / pressure: BME280-class board on the Pi's I2C
+Sensors as of 2026-11-23: BME688 (air) + LIS3DH (motion) on the sensor Pico W,
+read by `forrest-sensors` (forrest.dashboard.sensors turns its state into env /
+motion here). Planned:
   * position: USB GPS (u-blox M8/M9) on the Pi
   * battery voltage: divider into a Pico ADC pin, reported in the Pico's STAT
 When a driver exists, pass its reading in and the row fills itself in.
@@ -25,23 +26,54 @@ def _none(label, why):
 
 
 def sidebar(env: Optional[dict] = None, gps: Optional[dict] = None,
-            battery_v: Optional[float] = None, pico: Optional[dict] = None) -> list[dict]:
+            battery_v: Optional[float] = None, pico: Optional[dict] = None,
+            motion: Optional[dict] = None, env_why: str = "no sensor yet",
+            motion_why: str = "no sensor yet") -> list[dict]:
     """-> [{"key", "title", "rows": [...]}, ...] in display order.
 
-    env:  {"temp_c", "humidity_pct", "pressure_hpa"}   (from the BME280 driver, later)
+    env:    {"temp_c", "humidity_pct", "pressure_hpa", "gas_ohm", "gas_low"}  (BME688)
+    motion: {"face", "tilt_deg", "upside_down", "peak_g", "last_event"}       (LIS3DH)
+    env_why / motion_why: why there's no reading (shown instead of numbers)
     gps:  {"lat", "lon", "sats", "fix", "speed_mps", "heading_deg"}   (later)
     pico: the dashboard Pico panel (forrest.dashboard.pico.panel output)
     """
     out = []
 
     if env is None:
-        rows = [_none("Air temp", "no sensor yet"), _none("Humidity", "no sensor yet"),
-                _none("Pressure", "no sensor yet")]
+        rows = [_none("Air temp", env_why), _none("Humidity", env_why),
+                _none("Pressure", env_why), _none("Gas", env_why)]
     else:
         rows = [_row("Air temp", f"{env['temp_c']:.1f} °C"),
                 _row("Humidity", f"{env['humidity_pct']:.0f} %"),
                 _row("Pressure", f"{env['pressure_hpa']:.0f} hPa")]
+        gas = env.get("gas_ohm")
+        if gas is None:
+            rows.append(_none("Gas", "heater warming up"))
+        elif env.get("gas_low"):
+            rows.append(_row("Gas", f"≤ {gas / 1000:.1f} kΩ", "below range: new sensor, burn-in", "warn"))
+        else:
+            rows.append(_row("Gas", f"{gas / 1000:.1f} kΩ",
+                             "raw resistance; higher = cleaner air (meaningful after ~24 h burn-in)"))
     out.append({"key": "env", "title": "Environment", "rows": rows})
+
+    if motion is None:
+        rows = [_none("Orientation", motion_why), _none("Tilt", motion_why), _none("Last event", motion_why)]
+    else:
+        down = motion.get("upside_down")
+        face = motion.get("face") or "?"
+        label = {"up": "level, face up", "down": "upside down", "moving": "moving"}.get(face, f"on its side ({face})")
+        rows = [_row("Orientation", "UPSIDE DOWN" if down else label, "", "bad" if down else "ok"),
+                _row("Tilt", f"{motion.get('tilt_deg', 0):.0f}°", f"peak {motion.get('peak_g', 0):.2f} g in the last second")]
+        ev = motion.get("last_event")
+        if ev is None:
+            rows.append(_row("Last event", "none", "no flip or impact in the last 10 min"))
+        else:
+            what = {"IMPACT": f"impact {ev['v']:.1f} g", "FLIP": "flipped over", "UPRIGHT": "back upright"}.get(
+                ev["what"], ev["what"])
+            ago = ev["ago_s"]
+            rows.append(_row("Last event", what, f"{ago:.0f} s ago" if ago < 90 else f"{ago / 60:.0f} min ago",
+                             "warn" if ev["what"] in ("IMPACT", "FLIP") else "ok"))
+    out.append({"key": "motion", "title": "Motion", "rows": rows})
 
     if gps is None:
         rows = [_none("Position", "no GPS yet"), _none("Satellites", "no GPS yet"),

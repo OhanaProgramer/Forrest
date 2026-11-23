@@ -1,0 +1,19 @@
+# Forrest sensor monitor as a systemd *user* service. Listens to the sensor Pico W
+# (BME688 air + LIS3DH motion) and writes $XDG_RUNTIME_DIR/forrest/sensors.json for
+# forrest-dash, plus a daily log in data/sensors/.
+# Install: pi/systemd/install-sensors.sh   (linger is already on for forrest-dash)
+# While it runs it holds the sensor Pico's port: `firmware/pico/deploy.sh sensors`
+# pauses it for you.
+[Unit]
+Description=Forrest sensor monitor (forrest sensors monitor: BME688 + LIS3DH on the Pico W)
+
+[Service]
+WorkingDirectory=%h/Projects/02_builds/forrest
+# print straight to the journal (Python buffers stdout when it is not a terminal)
+Environment=PYTHONUNBUFFERED=1
+ExecStart=%h/Projects/02_builds/forrest/.venv/bin/forrest sensors monitor
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
