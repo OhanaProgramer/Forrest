@@ -56,18 +56,23 @@ class Motion:
 
     upside down: Z below -FLIP_Z for FLIP_HOLD_MS (a bump that flicks Z for one
     sample isn't a flip); back upright: Z above +FLIP_Z for FLIP_HOLD_MS.
-    impact: |g| at or above IMPACT_G, then IMPACT_GAP_MS quiet before the next.
+    impact: |g| at or above IMPACT_G starts a shock; the event is sent when it
+    ends (first sample back under IMPACT_G, or IMPACT_MAX_MS at most) and carries
+    the shock's peak, not its first sample (Jr 2026-11-24: first 3.2 g, peak 5.38 g).
+    Then IMPACT_GAP_MS from the shock's start before the next one.
     Thresholds are bench guesses; set them on the car.
     """
     FLIP_Z = 0.5
     FLIP_HOLD_MS = 500
     IMPACT_G = 2.5
     IMPACT_GAP_MS = 500
+    IMPACT_MAX_MS = 100
 
     def __init__(self):
         self.upside_down = False
         self._cand_since = None
-        self._last_impact = None
+        self._last_impact = None          # start of the last shock (ms)
+        self._shock_peak = None           # peak g of the shock in progress, else None
         self.peak_g = 0.0                 # since the last take_peak()
 
     def update(self, x, y, z, now_ms):
@@ -75,10 +80,16 @@ class Motion:
         ev = []
         g = magnitude(x, y, z)
         self.peak_g = max(self.peak_g, g)
-        if g >= self.IMPACT_G and (self._last_impact is None
-                                   or now_ms - self._last_impact >= self.IMPACT_GAP_MS):
+        if self._shock_peak is not None:
+            if g >= self.IMPACT_G and now_ms - self._last_impact < self.IMPACT_MAX_MS:
+                self._shock_peak = max(self._shock_peak, g)
+            else:
+                ev.append(("IMPACT", round(self._shock_peak, 2)))
+                self._shock_peak = None
+        elif g >= self.IMPACT_G and (self._last_impact is None
+                                     or now_ms - self._last_impact >= self.IMPACT_GAP_MS):
             self._last_impact = now_ms
-            ev.append(("IMPACT", round(g, 2)))
+            self._shock_peak = g
         flipping = (z < -self.FLIP_Z) if not self.upside_down else (z > self.FLIP_Z)
         if flipping:
             if self._cand_since is None:

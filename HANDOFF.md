@@ -26,9 +26,11 @@ finished items are deleted from here.
   baseline; later repeat the dehydrator to check the signature repeats.
 - **Motion, first real tests (Jacque):** 06:39 board moved, left at 20-21 deg tilt face up (no false flip);
   07:55:14 table pound -> `EVT IMPACT 3.2`, the only event in ~19 h (no false triggers). FLIP not yet tested.
-- **Bug to fix (after burn-in ends ~12:45 11-24, Pico reset):** IMPACT reports the *first* sample >= 2.5 g
-  (3.2), not the peak of the shock; the 1 s ACC summary had peak 5.38 g. Report the max over the impact
-  window instead (`firmware/pico/sensors/lis3dh.py:78`). Also stale comment at lis3dh.py:5 (says +-2 g, is +-8 g).
+- **Burn-in ended 14:50 11-24 (Jacque); clean burn-in on another day.** Gas was ~50 kOhm, RH 34 % at the end.
+- **Fixed + deployed 14:50:** IMPACT used to report the *first* sample >= 2.5 g (3.2) instead of the shock's peak
+  (1 s ACC summary had 5.38 g). Now the event is sent when the shock ends (first sample < 2.5 g, max 100 ms)
+  and carries its peak. 115 tests pass. **Not yet hit on hardware with the new firmware**: next table pound
+  should report about the summary's peak. Deploy reset the Pico W; monitor link back in 3 s.
 - Mac to-do (Continuity): SYSTEMS.md bench log: dehydrator reference event + first impact test (numbers above).
 
 ## Resume here (2026-11-23 ~12:50, forrest-jr): sensor burn-in running, leave Jr alone ~24 h

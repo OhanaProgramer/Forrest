@@ -45,12 +45,21 @@ def test_flip_needs_to_be_held():
     assert m.update(0, 0, 1, 1100) == [] and m.update(0, 0, 1, 1600) == [("UPRIGHT", 1)]
 
 
-def test_impact_once_per_gap_and_peak():
+def test_impact_reports_shock_peak_once_per_gap():
     m = lis3dh.Motion()
-    assert m.update(0, 0, 3.0, 0) == [("IMPACT", 3.0)]
-    assert m.update(0, 0, 3.2, 100) == []                         # same hit, inside the gap
-    assert m.update(2.0, 0, 2.0, 700) == [("IMPACT", 2.83)]
-    assert m.take_peak() == 3.2 and m.take_peak() == 0.0
+    assert m.update(0, 0, 3.2, 0) == []                           # shock starts: wait for its peak
+    assert m.update(-5.38, 0, 1.0, 10) == []
+    assert m.update(0, 0, 1.0, 20) == [("IMPACT", 5.47)]          # ends -> peak, not the first 3.2
+    assert m.update(0, 0, 3.0, 100) == [] and m.update(0, 0, 1.0, 110) == []   # inside the gap
+    assert m.update(2.0, 0, 2.0, 700) == []
+    assert m.update(0, 0, 1.0, 710) == [("IMPACT", 2.83)]
+    assert m.take_peak() == 5.47 and m.take_peak() == 0.0
+
+
+def test_impact_long_push_capped():
+    m = lis3dh.Motion()
+    assert m.update(0, 0, 3.0, 0) == [] and m.update(0, 0, 4.0, 50) == []
+    assert m.update(0, 0, 3.5, 100) == [("IMPACT", 4.0)]          # still high at IMPACT_MAX_MS: send anyway
 
 
 # -- monitor (Pi) --------------------------------------------------------------
