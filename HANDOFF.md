@@ -15,6 +15,22 @@ finished items are deleted from here.
 5. Who edits code: either machine may change this repo. Hardware drivers and
    bench runs are done on forrest-jr; say in the item which machine owns a change.
 
+## 2026-11-24 morning (forrest-jr): burn-in readout, first motion tests
+- **Labelled events** now kept in `data/sensors/labels.jsonl` (start, end, kind, what, source, seen;
+  tracked with `git add -f`, the rest of data/ stays ignored). 3 entries so far, below.
+- **Dehydrator (known-gas reference, Jacque):** food dehydrator with cucumbers ran all night in the same room
+  from ~17:00 11-23. BME688: RH 38.5 -> 47.4 % and gas 25.3 -> 21.0 kOhm 17:00-18:15, second RH bump to
+  49.6 % ~20:00-21:00, then steady recovery to 31.4 kOhm / 41 % by 06:30. Temp barely moved (22.3-22.6 C).
+  So the gas channel responds to real VOC + moisture; but the overnight rise is partly the air clearing, so the
+  burn-in plateau is **not known yet**. Plan: a clean night (nothing running) in a few days = empty-room
+  baseline; later repeat the dehydrator to check the signature repeats.
+- **Motion, first real tests (Jacque):** 06:39 board moved, left at 20-21 deg tilt face up (no false flip);
+  07:55:14 table pound -> `EVT IMPACT 3.2`, the only event in ~19 h (no false triggers). FLIP not yet tested.
+- **Bug to fix (after burn-in ends ~12:45 11-24, Pico reset):** IMPACT reports the *first* sample >= 2.5 g
+  (3.2), not the peak of the shock; the 1 s ACC summary had peak 5.38 g. Report the max over the impact
+  window instead (`firmware/pico/sensors/lis3dh.py:78`). Also stale comment at lis3dh.py:5 (says +-2 g, is +-8 g).
+- Mac to-do (Continuity): SYSTEMS.md bench log: dehydrator reference event + first impact test (numbers above).
+
 ## Resume here (2026-11-23 ~12:50, forrest-jr): sensor burn-in running, leave Jr alone ~24 h
 - **Running:** forrest-dash (camera + Hailo), forrest-pico, **forrest-sensors (new)**. **LIDAR switched off**
   (dashboard switch; it still starts at boot, so a reboot turns it back on).
